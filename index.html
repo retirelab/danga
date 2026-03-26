@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>단가 계산기 Pro</title>
+<title>단가 계산기 Pro & 단위환산기</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -37,6 +37,23 @@
   .btn-primary:hover { background: #1d4ed8; }
   .btn-outline { border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; background: white; transition: all 0.1s; }
   .btn-outline:hover { background: #f8fafc; }
+
+  /* Input focus states for converter */
+  .converter-input:focus-within { border-color: #3b82f6 !important; background: #eff6ff; }
+
+  /* Responsive Converter Layout */
+  .mobile-tabs { display: flex; background: #f1f5f9; padding: 0.3rem; border-radius: 0.75rem; margin-bottom: 1.5rem; }
+  .converter-wrapper { display: flex; flex-direction: column; gap: 1.5rem; }
+  .converter-panel { display: none; }
+  .converter-panel.active { display: block; }
+  .panel-title { display: none; font-weight: 700; color: #475569; margin-bottom: 1rem; font-size: 1.1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
+
+  @media (min-width: 768px) {
+    .mobile-tabs { display: none !important; }
+    .converter-wrapper { flex-direction: row; gap: 2rem; }
+    .converter-panel { display: block !important; flex: 1; min-width: 0; }
+    .panel-title { display: block !important; }
+  }
 </style>
 </head>
 <body>
@@ -71,6 +88,7 @@ const IconX = ({size}) => <Icon size={size} d={["M18 6L6 18","M6 6l12 12"]} />;
 const IconDivide = ({size}) => <Icon size={size} d={["M5 12h14","M12 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2z","M12 19a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"]} />;
 const IconHistory = ({size}) => <Icon size={size} d={["M3 3v5h5","M3.05 13A9 9 0 1 0 6 5.3L3 8","M12 7v5l3 3"]} />;
 const IconPercent = ({size}) => <Icon size={size} d={["M19 5L5 19","M6.5 7a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z","M17.5 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"]} />;
+const IconRepeat = ({size}) => <Icon size={size} d={["M17 1l4 4-4 4", "M3 11V9a4 4 0 0 1 4-4h14", "M7 23l-4-4 4-4", "M21 13v2a4 4 0 0 1-4 4H3"]} />;
 
 function App() {
   const [activeTab, setActiveTab] = useState('forward');
@@ -112,6 +130,28 @@ function App() {
   // 4. Reverse Tab State
   const [revPurchasePrice, setRevPurchasePrice] = useState('');
   const [revSalesPrice, setRevSalesPrice] = useState('');
+
+  // 5. Converter Tab State (NEW)
+  const [converterType, setConverterType] = useState('flow'); // 'flow' | 'pressure'
+  const [flowValues, setFlowValues] = useState({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', g_h: '', g_min: '', g_s: '' });
+  const [pressureValues, setPressureValues] = useState({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
+
+  // --- Converter Constants ---
+  const FLOW_RATES = { 
+    m3_h: 1, m3_min: 1 / 60, l_h: 1000, l_min: 1000 / 60, l_s: 1000 / 3600,
+    g_h: 1000000, g_min: 1000000 / 60, g_s: 1000000 / 3600
+  };
+  const PRESSURE_RATES = { bar: 1, mpa: 0.1, kpa: 100, psi: 14.50377377, kgf_cm2: 1.01971621, m: 10.19716213 };
+
+  const FLOW_UNITS = [
+    { key: 'm3_h', label: '㎥/h' }, { key: 'm3_min', label: '㎥/min' },
+    { key: 'l_h', label: 'ℓ/h' }, { key: 'l_min', label: 'ℓ/min' }, { key: 'l_s', label: 'ℓ/s' },
+    { key: 'g_h', label: 'g/h' }, { key: 'g_min', label: 'g/min' }, { key: 'g_s', label: 'g/s' }
+  ];
+  const PRESSURE_UNITS = [
+    { key: 'm', label: 'm (미터)' }, { key: 'bar', label: 'bar' }, { key: 'kgf_cm2', label: 'kgf/c㎡' },
+    { key: 'psi', label: 'psi' }, { key: 'mpa', label: 'MPa' }, { key: 'kpa', label: 'kPa' }
+  ];
 
   // LocalStorage Effect
   useEffect(() => {
@@ -176,6 +216,64 @@ function App() {
     const parts = val.split('.');
     if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
     setter(val);
+  };
+
+  // --- Converter Logic ---
+  const formatConvertedValue = (val) => {
+    if (val === 0) return '0';
+    let str = Number(val.toPrecision(7)).toString();
+    if (str.includes('e')) {
+      str = val.toFixed(8).replace(/\.?0+$/, ''); 
+    }
+    return str;
+  };
+
+  const handleUnitChange = (type, unitKey, rawValue) => {
+    let value = rawValue.replace(/[^0-9.]/g, '');
+    const parts = value.split('.');
+    if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+
+    if (type === 'flow') {
+      if (value === '') {
+        setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', g_h: '', g_min: '', g_s: '' });
+        return;
+      }
+      const numValue = parseFloat(value);
+      const newValues = { ...flowValues, [unitKey]: value };
+      if (!isNaN(numValue)) {
+        const baseValue = numValue / FLOW_RATES[unitKey];
+        for (const k in FLOW_RATES) {
+          if (k !== unitKey) newValues[k] = formatConvertedValue(baseValue * FLOW_RATES[k]);
+        }
+      } else {
+        for (const k in FLOW_RATES) if (k !== unitKey) newValues[k] = '';
+      }
+      setFlowValues(newValues);
+    } else {
+      if (value === '') {
+        setPressureValues({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
+        return;
+      }
+      const numValue = parseFloat(value);
+      const newValues = { ...pressureValues, [unitKey]: value };
+      if (!isNaN(numValue)) {
+        const baseValue = numValue / PRESSURE_RATES[unitKey];
+        for (const k in PRESSURE_RATES) {
+          if (k !== unitKey) newValues[k] = formatConvertedValue(baseValue * PRESSURE_RATES[k]);
+        }
+      } else {
+        for (const k in PRESSURE_RATES) if (k !== unitKey) newValues[k] = '';
+      }
+      setPressureValues(newValues);
+    }
+  };
+
+  const resetConverter = () => {
+    if (converterType === 'flow') {
+      setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', g_h: '', g_min: '', g_s: '' });
+    } else {
+      setPressureValues({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
+    }
   };
 
   const saveNewMaker = () => {
@@ -246,14 +344,15 @@ function App() {
           <div style={{background:'#2563eb', padding:'0.5rem', borderRadius:'0.5rem', color:'white', display:'flex'}}><IconCalculator size={24} /></div>
           <h1 style={{fontSize:'1.25rem', fontWeight:800, color:'#1e293b'}}>단가 계산기 Pro</h1>
         </div>
-        <div style={{maxWidth:'56rem', margin:'0 auto', display:'flex', padding:'0 1rem', borderBottom:'1px solid #e2e8f0'}}>
+        <div style={{maxWidth:'56rem', margin:'0 auto', display:'flex', overflowX:'auto', padding:'0 1rem', borderBottom:'1px solid #e2e8f0'}}>
           {[
             { id:'forward', label:'단가/견적', Icon: IconCalculator },
             { id:'reverse', label:'과거역산', Icon: IconHistory },
             { id:'calc', label:'사칙연산', Icon: IconPlus },
+            { id:'converter', label:'단위환산', Icon: IconRepeat },
           ].map(tab => (
             <button key={tab.id} onClick={() => { setActiveTab(tab.id); setCopiedRow(null); }}
-              style={{flex:1, padding:'0.75rem 0.25rem', fontSize:'0.8rem', fontWeight:700, borderBottom: activeTab === tab.id ? '2px solid #2563eb' : '2px solid transparent',
+              style={{flex:1, minWidth:'80px', padding:'0.75rem 0.25rem', fontSize:'0.85rem', fontWeight:700, borderBottom: activeTab === tab.id ? '2px solid #2563eb' : '2px solid transparent',
                 color: activeTab === tab.id ? '#2563eb' : '#64748b', background:'none', display:'flex', alignItems:'center', justifyContent:'center', gap:'0.25rem', cursor:'pointer', transition:'all 0.15s', border:'none', whiteSpace:'nowrap'}}>
               <tab.Icon size={16} />{tab.label}
             </button>
@@ -446,8 +545,84 @@ function App() {
           </section>
         )}
 
+        {/* 4. 단위 환산 탭 (NEW) */}
+        {activeTab === 'converter' && (
+          <section style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', padding:'1.5rem'}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.5rem'}}>
+              <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+                <IconRepeat size={20} /> <h2 style={{fontWeight:700, color:'#1e293b'}}>단위 환산</h2>
+              </div>
+              <button onClick={resetConverter} style={{color:'#ef4444', fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.25rem', background:'none', border:'none', cursor:'pointer'}}>
+                <IconRefresh size={16} /> 초기화
+              </button>
+            </div>
+
+            {/* 모바일용 유량/압력 토글 (PC에서는 숨김 처리됨) */}
+            <div className="mobile-tabs">
+              <button onClick={() => setConverterType('flow')} 
+                style={{flex:1, padding:'0.75rem', borderRadius:'0.5rem', border:'none', fontWeight:700, fontSize:'1rem', cursor:'pointer', transition:'all 0.2s',
+                        background: converterType === 'flow' ? 'white' : 'transparent', color: converterType === 'flow' ? '#2563eb' : '#64748b', boxShadow: converterType === 'flow' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'}}>
+                유량
+              </button>
+              <button onClick={() => setConverterType('pressure')} 
+                style={{flex:1, padding:'0.75rem', borderRadius:'0.5rem', border:'none', fontWeight:700, fontSize:'1rem', cursor:'pointer', transition:'all 0.2s',
+                        background: converterType === 'pressure' ? 'white' : 'transparent', color: converterType === 'pressure' ? '#2563eb' : '#64748b', boxShadow: converterType === 'pressure' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'}}>
+                압력
+              </button>
+            </div>
+
+            {/* 입력 리스트 영역 (PC: 2단 분할, 모바일: 탭 기반) */}
+            <div className="converter-wrapper">
+              
+              {/* 유량 패널 */}
+              <div className={`converter-panel ${converterType === 'flow' ? 'active' : ''}`}>
+                <h3 className="panel-title">유량</h3>
+                <div style={{display:'grid', gridTemplateColumns:'1fr', gap:'0.75rem'}}>
+                  {FLOW_UNITS.map((item) => (
+                    <div key={item.key} className="converter-input transition-all" style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.85rem 1rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', background:'white'}}>
+                      <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={flowValues[item.key]}
+                        onChange={(e) => handleUnitChange('flow', item.key, e.target.value)}
+                        placeholder="0"
+                        style={{flex:1, textAlign:'right', padding:'0', border:'none', outline:'none', fontSize:'1.25rem', fontWeight:800, color:'#2563eb', background:'transparent', width:'100%'}}
+                      />
+                      <label style={{fontWeight:700, color:'#475569', width:'70px', textAlign:'left', flexShrink:0, fontSize:'0.95rem'}}>{item.label}</label>
+                    </div>
+                  ))}
+                </div>
+                <p style={{fontSize:'0.8rem', color:'#64748b', marginTop:'1rem', textAlign:'center'}}>
+                  * 질량 단위(g)는 <strong>물(밀도 1g/㎤)</strong>을 기준으로 산출됩니다.
+                </p>
+              </div>
+
+              {/* 압력 패널 */}
+              <div className={`converter-panel ${converterType === 'pressure' ? 'active' : ''}`}>
+                <h3 className="panel-title">압력</h3>
+                <div style={{display:'grid', gridTemplateColumns:'1fr', gap:'0.75rem'}}>
+                  {PRESSURE_UNITS.map((item) => (
+                    <div key={item.key} className="converter-input transition-all" style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.85rem 1rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', background:'white'}}>
+                      <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={pressureValues[item.key]}
+                        onChange={(e) => handleUnitChange('pressure', item.key, e.target.value)}
+                        placeholder="0"
+                        style={{flex:1, textAlign:'right', padding:'0', border:'none', outline:'none', fontSize:'1.25rem', fontWeight:800, color:'#2563eb', background:'transparent', width:'100%'}}
+                      />
+                      <label style={{fontWeight:700, color:'#475569', width:'70px', textAlign:'left', flexShrink:0, fontSize:'0.95rem'}}>{item.label}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </section>
+        )}
+
         {/* 하단 판매 단가 테이블 (견적/사칙연산 공통) */}
-        {(activeTab === 'forward' || activeTab === 'calc') && parseNum(currentActivePriceDisplay) > 0 && (
+        {(activeTab === 'forward' || activeTab === 'calc') && (
           <section style={{marginTop:'1.5rem'}}>
             <div style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', padding:'1.25rem', marginBottom:'1rem'}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
@@ -462,41 +637,63 @@ function App() {
                   </select>
                 </div>
               </div>
-              <div style={{fontSize:'1.8rem', fontWeight:800, textAlign:'right', padding:'0.75rem', background:'#f8fafc', borderRadius:'0.75rem', border:'1px solid #cbd5e1'}}>
-                {formatNumber(currentActivePriceDisplay)} <span style={{fontSize:'1rem', color:'#64748b'}}>원 기준</span>
+              
+              <div className="converter-input transition-all" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'1rem 1.25rem', background:'#f8fafc', borderRadius:'0.75rem', border:'1px solid #cbd5e1'}}>
+                <div style={{fontSize:'0.9rem', fontWeight:700, color:'#475569'}}>단가표 기준 금액 (매입가) 직접 입력</div>
+                <div style={{display:'flex', alignItems:'center', flex:1, justifyContent:'flex-end'}}>
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    value={currentActivePriceDisplay ? formatNumber(currentActivePriceDisplay) : ''} 
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^\d]/g, '');
+                      if (activeTab === 'forward') setForwardPrice(val);
+                      else if (activeTab === 'calc') setCalcPrice(val);
+                    }}
+                    placeholder="0"
+                    style={{fontSize:'1.8rem', fontWeight:800, textAlign:'right', background:'transparent', border:'none', outline:'none', color:'#1e293b', width:'100%', maxWidth:'250px'}}
+                  />
+                  <span style={{fontSize:'1rem', color:'#64748b', marginLeft:'0.5rem', fontWeight:600}}>원 기준</span>
+                </div>
               </div>
             </div>
 
-            <div style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', overflow:'hidden'}}>
-              <div style={{maxHeight:'60vh', overflowY:'auto'}}>
-                <table>
-                  <thead style={{position:'sticky', top:0, zIndex:10, background:'#f1f5f9'}}>
-                    <tr>
-                      <th style={{textAlign:'center'}}>배수</th><th style={{textAlign:'center'}}>가산율</th><th style={{textAlign:'right'}}>판매 단가</th><th style={{textAlign:'right'}}>이익</th><th style={{textAlign:'center'}}>복사</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.filter(r => showHighMargin || r.marginRate <= 50).map(row => (
-                      <tr key={row.index} style={{background: row.marginRate % 10 === 0 ? '#f8fafc' : 'white'}}>
-                        <td style={{textAlign:'center', color:'#64748b', fontSize:'0.85rem'}}>x{row.multiplier}</td>
-                        <td style={{textAlign:'center', fontWeight:700, color: row.marginRate >= 30 ? '#ef4444' : '#1e293b'}}>{row.marginRate}%</td>
-                        <td style={{textAlign:'right', fontWeight:800, color:'#1e293b', fontSize:'1.1rem'}}>{formatNumber(row.sellingPrice)}</td>
-                        <td style={{textAlign:'right', color:'#16a34a', fontSize:'0.9rem'}}>+{formatNumber(row.profit)}</td>
-                        <td style={{textAlign:'center'}}>
-                          <button onClick={() => handleCopy(row.sellingPrice, row.index)} style={{padding:'0.4rem', borderRadius:'0.4rem', background: copiedRow===row.index?'#dcfce7':'#f1f5f9', color: copiedRow===row.index?'#16a34a':'#64748b', border:'none', cursor:'pointer'}}>
-                            {copiedRow===row.index ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                          </button>
-                        </td>
+            {parseNum(currentActivePriceDisplay) > 0 && (
+              <div style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', overflow:'hidden'}}>
+                <div style={{maxHeight:'60vh', overflowY:'auto'}}>
+                  <table>
+                    <thead style={{position:'sticky', top:0, zIndex:10, background:'#f1f5f9'}}>
+                      <tr>
+                        <th style={{textAlign:'center'}}>배수</th>
+                        <th style={{textAlign:'center'}}>가산율</th>
+                        <th style={{textAlign:'right'}}>판매 단가</th>
+                        <th style={{textAlign:'right'}}>이익</th>
+                        <th style={{textAlign:'center'}}>복사</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <button onClick={() => setShowHighMargin(!showHighMargin)} style={{width:'100%', padding:'1rem', background:'#f1f5f9', color:'#475569', fontWeight:700, border:'none', cursor:'pointer', transition:'background 0.1s'}}>
-                  {showHighMargin ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
-                  {showHighMargin ? '고가산 구간 접기' : '51% ~ 100% 구간 펼쳐보기'}
-                </button>
+                    </thead>
+                    <tbody>
+                      {rows.filter(r => showHighMargin || r.marginRate <= 50).map(row => (
+                        <tr key={row.index} style={{background: row.marginRate % 10 === 0 ? '#f8fafc' : 'white'}}>
+                          <td style={{textAlign:'center', color:'#64748b', fontSize:'0.85rem'}}>x{row.multiplier}</td>
+                          <td style={{textAlign:'center', fontWeight:700, color: row.marginRate >= 30 ? '#ef4444' : '#1e293b'}}>{row.marginRate}%</td>
+                          <td style={{textAlign:'right', fontWeight:800, color:'#1e293b', fontSize:'1.1rem'}}>{formatNumber(row.sellingPrice)}</td>
+                          <td style={{textAlign:'right', color:'#16a34a', fontSize:'0.9rem'}}>+{formatNumber(row.profit)}</td>
+                          <td style={{textAlign:'center'}}>
+                            <button onClick={() => handleCopy(row.sellingPrice, row.index)} style={{padding:'0.4rem', borderRadius:'0.4rem', background: copiedRow===row.index?'#dcfce7':'#f1f5f9', color: copiedRow===row.index?'#16a34a':'#64748b', border:'none', cursor:'pointer'}}>
+                              {copiedRow===row.index ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <button onClick={() => setShowHighMargin(!showHighMargin)} style={{width:'100%', padding:'1rem', background:'#f1f5f9', color:'#475569', fontWeight:700, border:'none', cursor:'pointer', transition:'background 0.1s'}}>
+                    {showHighMargin ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
+                    {showHighMargin ? '고가산 구간 접기' : '51% ~ 100% 구간 펼쳐보기'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </section>
         )}
       </main>
