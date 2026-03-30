@@ -20,7 +20,6 @@
   input, select, button { font-family: inherit; }
   .transition-all { transition: all 0.15s; }
   
-  /* custom scrollbar */
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: #f1f5f9; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -38,10 +37,8 @@
   .btn-outline { border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; background: white; transition: all 0.1s; }
   .btn-outline:hover { background: #f8fafc; }
 
-  /* Input focus states for converter */
   .converter-input:focus-within { border-color: #3b82f6 !important; background: #eff6ff; }
 
-  /* Responsive Converter Layout */
   .mobile-tabs { display: flex; background: #f1f5f9; padding: 0.3rem; border-radius: 0.75rem; margin-bottom: 1.5rem; }
   .converter-wrapper { display: flex; flex-direction: column; gap: 1.5rem; }
   .converter-panel { display: none; }
@@ -59,7 +56,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useMemo, useRef } = React;
+const { useState, useEffect, useMemo } = React;
 
 const DEFAULT_MAKERS = [
   { id: 'default', name: '기본 3단계 (0.7 ➔ 0.9 ➔ 0.95)', factor1: '0.7', useStep2: true, factor2: '0.9', useStep3: true, factor3: '0.95' },
@@ -67,7 +64,6 @@ const DEFAULT_MAKERS = [
   { id: 'maker_b', name: 'B사 1단계만 (0.7)', factor1: '0.7', useStep2: false, factor2: '0.9', useStep3: false, factor3: '0.95' }
 ];
 
-// Icons
 const Icon = ({ d, size = 20, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     {Array.isArray(d) ? d.map((p,i) => <path key={i} d={p} />) : <path d={d} />}
@@ -94,14 +90,12 @@ function App() {
   const [activeTab, setActiveTab] = useState('forward');
   const [makers, setMakers] = useState(DEFAULT_MAKERS);
 
-  // General Format Helpers
   const formatNumber = (num) => new Intl.NumberFormat('ko-KR').format(num);
   const parseNum = (str) => {
     if (!str) return 0;
     return parseFloat(str.toString().replace(/,/g, '')) || 0;
   };
 
-  // 1. Forward Tab State
   const [selectedMaker, setSelectedMaker] = useState('default');
   const [isAddingMaker, setIsAddingMaker] = useState(false);
   const [newMakerName, setNewMakerName] = useState('');
@@ -115,82 +109,73 @@ function App() {
   const [forwardPrice, setForwardPrice] = useState('');
   const [saveFlash, setSaveFlash] = useState(false);
 
-  // 2. Arithmetic Tab State
   const [calcInputCount, setCalcInputCount] = useState(3);
   const [calcInputs, setCalcInputs] = useState(Array(10).fill(''));
   const [calcOperator, setCalcOperator] = useState('+');
   const [calcResult, setCalcResult] = useState(0);
   const [calcPrice, setCalcPrice] = useState('');
 
-  // 3. Common Table State
   const [copiedRow, setCopiedRow] = useState(null);
   const [roundingUnit, setRoundingUnit] = useState('1');
   const [showHighMargin, setShowHighMargin] = useState(false);
 
-  // 4. Reverse Tab State
   const [revPurchasePrice, setRevPurchasePrice] = useState('');
   const [revSalesPrice, setRevSalesPrice] = useState('');
 
-  // 5. Converter Tab State (NEW)
-  const [converterType, setConverterType] = useState('flow'); // 'flow' | 'pressure'
-  const [flowValues, setFlowValues] = useState({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', g_h: '', g_min: '', g_s: '' });
+  const [converterType, setConverterType] = useState('flow');
+  const [flowValues, setFlowValues] = useState({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', gal_h: '', gal_min: '', gal_s: '' });
   const [pressureValues, setPressureValues] = useState({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
 
-  // --- Converter Constants ---
+  // 1 ㎥ = 264.172052 US Gallons
   const FLOW_RATES = { 
-    m3_h: 1, m3_min: 1 / 60, l_h: 1000, l_min: 1000 / 60, l_s: 1000 / 3600,
-    g_h: 1000000, g_min: 1000000 / 60, g_s: 1000000 / 3600
+    m3_h: 1, 
+    m3_min: 1 / 60, 
+    l_h: 1000, 
+    l_min: 1000 / 60, 
+    l_s: 1000 / 3600,
+    gal_h: 264.172, 
+    gal_min: 264.172 / 60, 
+    gal_s: 264.172 / 3600
   };
-  const PRESSURE_RATES = { bar: 1, mpa: 0.1, kpa: 100, psi: 14.50377377, kgf_cm2: 1.01971621, m: 10.19716213 };
+  const PRESSURE_RATES = { bar: 1, mpa: 0.1, kpa: 100, psi: 14.50377, kgf_cm2: 1.01972, m: 10.19716 };
 
   const FLOW_UNITS = [
     { key: 'm3_h', label: '㎥/h' }, { key: 'm3_min', label: '㎥/min' },
     { key: 'l_h', label: 'ℓ/h' }, { key: 'l_min', label: 'ℓ/min' }, { key: 'l_s', label: 'ℓ/s' },
-    { key: 'g_h', label: 'g/h' }, { key: 'g_min', label: 'g/min' }, { key: 'g_s', label: 'g/s' }
+    { key: 'gal_h', label: 'gal/h' }, { key: 'gal_min', label: 'gal/min' }, { key: 'gal_s', label: 'gal/s' }
   ];
   const PRESSURE_UNITS = [
     { key: 'm', label: 'm (미터)' }, { key: 'bar', label: 'bar' }, { key: 'kgf_cm2', label: 'kgf/c㎡' },
     { key: 'psi', label: 'psi' }, { key: 'mpa', label: 'MPa' }, { key: 'kpa', label: 'kPa' }
   ];
 
-  // LocalStorage Effect
   useEffect(() => {
     try {
       const saved = localStorage.getItem('calculatorMakers');
-      if (saved) {
-        setMakers(JSON.parse(saved));
-      }
+      if (saved) setMakers(JSON.parse(saved));
     } catch (e) {}
   }, []);
 
-  // Sync Logic for Forward Tab
   useEffect(() => {
     const numFactory = parseNum(factoryPrice);
     const f1 = parseFloat(factor1) || 0;
     const f2 = parseFloat(factor2) || 0;
     const f3 = parseFloat(factor3) || 0;
-    
     const s1 = Math.round(numFactory * f1);
     const s2 = useStep2 ? Math.round(s1 * f2) : s1;
     const s3 = (useStep2 && useStep3) ? Math.round(s2 * f3) : s2;
-
     let targetPrice = s3;
     if (basePriceType === 'step1') targetPrice = s1;
     else if (basePriceType === 'step2') targetPrice = s2;
-    
     if (numFactory > 0) setForwardPrice(targetPrice.toString());
     else setForwardPrice('');
   }, [factoryPrice, factor1, factor2, factor3, useStep2, useStep3, basePriceType]);
 
-  // Sync Logic for Arithmetic Tab
   useEffect(() => {
     const validInputs = calcInputs.slice(0, calcInputCount).filter(v => v.trim() !== '');
     if (validInputs.length === 0) {
-      setCalcResult(0);
-      setCalcPrice('');
-      return;
+      setCalcResult(0); setCalcPrice(''); return;
     }
-
     const validNums = validInputs.map(v => parseNum(v));
     let res = validNums[0];
     for(let i = 1; i < validNums.length; i++) {
@@ -200,17 +185,11 @@ function App() {
       else if (calcOperator === '*') res *= next;
       else if (calcOperator === '/') res = next !== 0 ? res / next : res;
     }
-    
     const roundedRes = Math.round(res);
-    setCalcResult(roundedRes);
-    setCalcPrice(roundedRes.toString());
+    setCalcResult(roundedRes); setCalcPrice(roundedRes.toString());
   }, [calcInputs, calcOperator, calcInputCount]);
 
-  const handlePriceChange = (e, setter) => {
-    const value = e.target.value.replace(/[^\d]/g, '');
-    setter(value);
-  };
-
+  const handlePriceChange = (e, setter) => setter(e.target.value.replace(/[^\d]/g, ''));
   const handleFactorChange = (e, setter) => {
     let val = e.target.value.replace(/[^0-9.]/g, '');
     const parts = val.split('.');
@@ -218,13 +197,10 @@ function App() {
     setter(val);
   };
 
-  // --- Converter Logic ---
   const formatConvertedValue = (val) => {
     if (val === 0) return '0';
     let str = Number(val.toPrecision(7)).toString();
-    if (str.includes('e')) {
-      str = val.toFixed(8).replace(/\.?0+$/, ''); 
-    }
+    if (str.includes('e')) str = val.toFixed(8).replace(/\.?0+$/, '');
     return str;
   };
 
@@ -235,16 +211,14 @@ function App() {
 
     if (type === 'flow') {
       if (value === '') {
-        setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', g_h: '', g_min: '', g_s: '' });
+        setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', gal_h: '', gal_min: '', gal_s: '' });
         return;
       }
       const numValue = parseFloat(value);
       const newValues = { ...flowValues, [unitKey]: value };
       if (!isNaN(numValue)) {
         const baseValue = numValue / FLOW_RATES[unitKey];
-        for (const k in FLOW_RATES) {
-          if (k !== unitKey) newValues[k] = formatConvertedValue(baseValue * FLOW_RATES[k]);
-        }
+        for (const k in FLOW_RATES) if (k !== unitKey) newValues[k] = formatConvertedValue(baseValue * FLOW_RATES[k]);
       } else {
         for (const k in FLOW_RATES) if (k !== unitKey) newValues[k] = '';
       }
@@ -258,9 +232,7 @@ function App() {
       const newValues = { ...pressureValues, [unitKey]: value };
       if (!isNaN(numValue)) {
         const baseValue = numValue / PRESSURE_RATES[unitKey];
-        for (const k in PRESSURE_RATES) {
-          if (k !== unitKey) newValues[k] = formatConvertedValue(baseValue * PRESSURE_RATES[k]);
-        }
+        for (const k in PRESSURE_RATES) if (k !== unitKey) newValues[k] = formatConvertedValue(baseValue * PRESSURE_RATES[k]);
       } else {
         for (const k in PRESSURE_RATES) if (k !== unitKey) newValues[k] = '';
       }
@@ -269,11 +241,8 @@ function App() {
   };
 
   const resetConverter = () => {
-    if (converterType === 'flow') {
-      setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', g_h: '', g_min: '', g_s: '' });
-    } else {
-      setPressureValues({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
-    }
+    if (converterType === 'flow') setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', gal_h: '', gal_min: '', gal_s: '' });
+    else setPressureValues({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
   };
 
   const saveNewMaker = () => {
@@ -291,8 +260,7 @@ function App() {
     const updated = makers.map(m => m.id === selectedMaker ? { ...m, factor1, factor2, factor3, useStep2, useStep3 } : m);
     setMakers(updated);
     localStorage.setItem('calculatorMakers', JSON.stringify(updated));
-    setSaveFlash(true);
-    setTimeout(() => setSaveFlash(false), 1200);
+    setSaveFlash(true); setTimeout(() => setSaveFlash(false), 1200);
   };
 
   const deleteMaker = () => {
@@ -300,20 +268,14 @@ function App() {
     const updated = makers.filter(m => m.id !== selectedMaker);
     setMakers(updated);
     localStorage.setItem('calculatorMakers', JSON.stringify(updated));
-    
     const first = updated[0];
-    setSelectedMaker(first.id);
-    setFactor1(first.factor1);
-    setFactor2(first.factor2);
-    setFactor3(first.factor3);
-    setUseStep2(first.useStep2 !== false);
-    setUseStep3(first.useStep2 !== false && first.useStep3 !== false);
+    setSelectedMaker(first.id); setFactor1(first.factor1); setFactor2(first.factor2); setFactor3(first.factor3);
+    setUseStep2(first.useStep2 !== false); setUseStep3(first.useStep2 !== false && first.useStep3 !== false);
   };
 
   const handleCopy = (price, index) => {
-    const text = price.toString();
     const ta = document.createElement("textarea");
-    ta.value = text; document.body.appendChild(ta); ta.select();
+    ta.value = price.toString(); document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); setCopiedRow(index); setTimeout(() => setCopiedRow(null), 1500); } catch(e) {}
     document.body.removeChild(ta);
   };
@@ -322,7 +284,6 @@ function App() {
     const activePrice = activeTab === 'forward' ? forwardPrice : calcPrice;
     const numericPrice = parseNum(activePrice);
     if (!numericPrice) return [];
-    
     const res = [];
     for (let i = 1; i <= 100; i++) {
       const multiplier = (100 + i) / 100;
@@ -338,7 +299,6 @@ function App() {
 
   return (
     <div style={{minHeight:'100vh', background:'#f1f5f9', paddingBottom:'3rem'}}>
-      {/* Header */}
       <header style={{background:'white', boxShadow:'0 1px 2px rgba(0,0,0,0.07)', position:'sticky', top:0, zIndex:30}}>
         <div style={{maxWidth:'56rem', margin:'0 auto', padding:'1rem', display:'flex', alignItems:'center', gap:'0.75rem'}}>
           <div style={{background:'#2563eb', padding:'0.5rem', borderRadius:'0.5rem', color:'white', display:'flex'}}><IconCalculator size={24} /></div>
@@ -361,8 +321,6 @@ function App() {
       </header>
 
       <main style={{maxWidth:'56rem', margin:'0 auto', padding:'0 1rem', marginTop:'1.5rem'}}>
-        
-        {/* 1. 단가/견적 계산 탭 */}
         {activeTab === 'forward' && (
           <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
             <section style={{background:'white', borderRadius:'1rem', border:'1px solid #e0e7ff', overflow:'hidden'}}>
@@ -405,35 +363,10 @@ function App() {
                   </div>
                 </div>
                 <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:'0.75rem'}}>
-                  {/* Step UI */}
                   {[
-                    {
-                      id:'step1', label:'1차: 대리점가', 
-                      val: Math.round((parseNum(factoryPrice) * (parseFloat(factor1) || 0))), 
-                      factor:factor1, setFactor:setFactor1, use:true
-                    },
-                    {
-                      id:'step2', label:'2차: 매입원가', 
-                      val: Math.round(Math.round((parseNum(factoryPrice) * (parseFloat(factor1) || 0))) * (parseFloat(factor2) || 0)), 
-                      factor:factor2, setFactor:setFactor2, use:useStep2, 
-                      setUse: (v) => { 
-                        setUseStep2(v); 
-                        if(!v) { 
-                          setUseStep3(false); 
-                          setBasePriceType('step1'); 
-                        } 
-                      }
-                    },
-                    {
-                      id:'step3', label:'3차: 실매입가', 
-                      val: Math.round(Math.round(Math.round((parseNum(factoryPrice) * (parseFloat(factor1) || 0))) * (parseFloat(factor2) || 0)) * (parseFloat(factor3) || 0)), 
-                      factor:factor3, setFactor:setFactor3, use:useStep3, 
-                      setUse: (v) => {
-                        setUseStep3(v);
-                        if(!v && basePriceType === 'step3') setBasePriceType('step2');
-                      }, 
-                      parent:useStep2
-                    }
+                    { id:'step1', label:'1차: 대리점가', val: Math.round((parseNum(factoryPrice) * (parseFloat(factor1) || 0))), factor:factor1, setFactor:setFactor1, use:true },
+                    { id:'step2', label:'2차: 매입원가', val: Math.round(Math.round((parseNum(factoryPrice) * (parseFloat(factor1) || 0))) * (parseFloat(factor2) || 0)), factor:factor2, setFactor:setFactor2, use:useStep2, setUse: (v) => { setUseStep2(v); if(!v) { setUseStep3(false); setBasePriceType('step1'); } } },
+                    { id:'step3', label:'3차: 실매입가', val: Math.round(Math.round(Math.round((parseNum(factoryPrice) * (parseFloat(factor1) || 0))) * (parseFloat(factor2) || 0)) * (parseFloat(factor3) || 0)), factor:factor3, setFactor:setFactor3, use:useStep3, setUse: (v) => { setUseStep3(v); if(!v && basePriceType === 'step3') setBasePriceType('step2'); }, parent:useStep2 }
                   ].map((step) => (
                     <div key={step.id} onClick={() => step.use && setBasePriceType(step.id)} 
                       style={{padding:'1rem', borderRadius:'0.75rem', border: basePriceType===step.id?'2px solid #818cf8':'1px solid #e2e8f0', background: basePriceType===step.id?'#eef2ff':'#f8fafc', opacity: step.use?1:0.5, cursor:'pointer', transition:'all 0.15s'}}>
@@ -455,7 +388,6 @@ function App() {
           </div>
         )}
 
-        {/* 2. 과거 역산 탭 */}
         {activeTab === 'reverse' && (
           <section style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', padding:'1.5rem'}}>
             <div style={{display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1.5rem'}}>
@@ -490,138 +422,81 @@ function App() {
           </section>
         )}
 
-        {/* 3. 사칙연산 계산 탭 */}
         {activeTab === 'calc' && (
           <section style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', padding:'1.25rem', marginBottom:'1.5rem'}}>
             <div style={{display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1rem', color:'#1e293b'}}>
               <IconPlus size={20} /> <h2 style={{fontWeight:700}}>사칙연산 매입가 계산</h2>
             </div>
-            
             <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:'0.75rem', marginBottom:'1rem'}}>
               {calcInputs.slice(0, calcInputCount).map((val, idx) => (
                 <div key={idx} style={{position:'relative'}}>
                   <input type="text" value={val ? formatNumber(val) : ''} onChange={e => {
-                    const next = [...calcInputs];
-                    next[idx] = e.target.value.replace(/[^\d]/g, '');
-                    setCalcInputs(next);
-                  }} placeholder={`금액 ${idx+1}`} 
-                  style={{width:'100%', padding:'0.6rem 2rem 0.6rem 0.75rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', textAlign:'right', fontSize:'0.9rem', fontWeight:600}} />
+                    const next = [...calcInputs]; next[idx] = e.target.value.replace(/[^\d]/g, ''); setCalcInputs(next);
+                  }} placeholder={`금액 ${idx+1}`} style={{width:'100%', padding:'0.6rem 2rem 0.6rem 0.75rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', textAlign:'right', fontSize:'0.9rem', fontWeight:600}} />
                   <span style={{position:'absolute', right:'0.5rem', top:'50%', transform:'translateY(-50%)', fontSize:'0.75rem', color:'#94a3b8'}}>원</span>
                 </div>
               ))}
               {calcInputCount < 10 && (
-                <button onClick={() => setCalcInputCount(prev => prev + 1)} 
-                  style={{border:'2px dashed #cbd5e1', borderRadius:'0.5rem', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', background:'none', cursor:'pointer', minHeight:'2.6rem'}}>
-                  <IconPlus size={20} />
-                </button>
+                <button onClick={() => setCalcInputCount(prev => prev + 1)} style={{border:'2px dashed #cbd5e1', borderRadius:'0.5rem', display:'flex', alignItems:'center', justifyContent:'center', color:'#94a3b8', background:'none', cursor:'pointer', minHeight:'2.6rem'}}><IconPlus size={20} /></button>
               )}
             </div>
-
             <div style={{background:'#f8fafc', padding:'1rem', borderRadius:'0.75rem', display:'flex', flexDirection:'column', gap:'0.75rem'}}>
-              {/* 상단 컨트롤 바 */}
               <div style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
                 <div style={{display:'flex', gap:'0.25rem', background:'#e2e8f0', padding:'0.25rem', borderRadius:'0.5rem'}}>
                   {[ {op:'+', Icon:IconPlus}, {op:'-', Icon:IconMinus}, {op:'*', Icon:IconX}, {op:'/', Icon:IconDivide} ].map(item => (
-                    <button key={item.op} onClick={() => setCalcOperator(item.op)}
-                      style={{width:'2.5rem', height:'2.25rem', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'0.375rem', background: calcOperator === item.op ? '#2563eb' : 'transparent', color: calcOperator === item.op ? 'white' : '#64748b', transition:'all 0.15s', border:'none', cursor:'pointer'}}>
-                      <item.Icon size={18} />
-                    </button>
+                    <button key={item.op} onClick={() => setCalcOperator(item.op)} style={{width:'2.5rem', height:'2.25rem', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'0.375rem', background: calcOperator === item.op ? '#2563eb' : 'transparent', color: calcOperator === item.op ? 'white' : '#64748b', transition:'all 0.15s', border:'none', cursor:'pointer'}}><item.Icon size={18} /></button>
                   ))}
                 </div>
-                <button onClick={() => { setCalcInputs(Array(10).fill('')); setCalcResult(0); setCalcInputCount(3); setCalcPrice(''); }} 
-                  style={{color:'#ef4444', fontSize:'0.875rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.25rem', background:'none', border:'none', cursor:'pointer'}}>
-                  <IconRefresh size={16} /> 초기화
-                </button>
+                <button onClick={() => { setCalcInputs(Array(10).fill('')); setCalcResult(0); setCalcInputCount(3); setCalcPrice(''); }} style={{color:'#ef4444', fontSize:'0.875rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.25rem', background:'none', border:'none', cursor:'pointer'}}><IconRefresh size={16} /> 초기화</button>
               </div>
-
-              {/* 합산 결과 표시 영역 */}
               <div style={{background:'white', borderRadius:'0.5rem', padding:'0.75rem 1rem', display:'flex', alignItems:'center', justifyContent:'space-between', border:'1px solid #e2e8f0', minWidth:0}}>
                 <span style={{fontSize:'0.875rem', color:'#64748b', flexShrink:0}}>합산 결과</span>
-                <span style={{fontSize:'1.5rem', fontWeight:800, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                  {formatNumber(calcResult)}원
-                </span>
+                <span style={{fontSize:'1.5rem', fontWeight:800, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{formatNumber(calcResult)}원</span>
               </div>
             </div>
           </section>
         )}
 
-        {/* 4. 단위 환산 탭 (NEW) */}
         {activeTab === 'converter' && (
           <section style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', padding:'1.5rem'}}>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.5rem'}}>
               <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
                 <IconRepeat size={20} /> <h2 style={{fontWeight:700, color:'#1e293b'}}>단위 환산</h2>
               </div>
-              <button onClick={resetConverter} style={{color:'#ef4444', fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.25rem', background:'none', border:'none', cursor:'pointer'}}>
-                <IconRefresh size={16} /> 초기화
-              </button>
+              <button onClick={resetConverter} style={{color:'#ef4444', fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.25rem', background:'none', border:'none', cursor:'pointer'}}><IconRefresh size={16} /> 초기화</button>
             </div>
-
-            {/* 모바일용 유량/압력 토글 (PC에서는 숨김 처리됨) */}
             <div className="mobile-tabs">
-              <button onClick={() => setConverterType('flow')} 
-                style={{flex:1, padding:'0.75rem', borderRadius:'0.5rem', border:'none', fontWeight:700, fontSize:'1rem', cursor:'pointer', transition:'all 0.2s',
-                        background: converterType === 'flow' ? 'white' : 'transparent', color: converterType === 'flow' ? '#2563eb' : '#64748b', boxShadow: converterType === 'flow' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'}}>
-                유량
-              </button>
-              <button onClick={() => setConverterType('pressure')} 
-                style={{flex:1, padding:'0.75rem', borderRadius:'0.5rem', border:'none', fontWeight:700, fontSize:'1rem', cursor:'pointer', transition:'all 0.2s',
-                        background: converterType === 'pressure' ? 'white' : 'transparent', color: converterType === 'pressure' ? '#2563eb' : '#64748b', boxShadow: converterType === 'pressure' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'}}>
-                압력
-              </button>
+              <button onClick={() => setConverterType('flow')} style={{flex:1, padding:'0.75rem', borderRadius:'0.5rem', border:'none', fontWeight:700, fontSize:'1rem', cursor:'pointer', transition:'all 0.2s', background: converterType === 'flow' ? 'white' : 'transparent', color: converterType === 'flow' ? '#2563eb' : '#64748b', boxShadow: converterType === 'flow' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'}}>유량</button>
+              <button onClick={() => setConverterType('pressure')} style={{flex:1, padding:'0.75rem', borderRadius:'0.5rem', border:'none', fontWeight:700, fontSize:'1rem', cursor:'pointer', transition:'all 0.2s', background: converterType === 'pressure' ? 'white' : 'transparent', color: converterType === 'pressure' ? '#2563eb' : '#64748b', boxShadow: converterType === 'pressure' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'}}>압력</button>
             </div>
-
-            {/* 입력 리스트 영역 (PC: 2단 분할, 모바일: 탭 기반) */}
             <div className="converter-wrapper">
-              
-              {/* 유량 패널 */}
               <div className={`converter-panel ${converterType === 'flow' ? 'active' : ''}`}>
-                <h3 className="panel-title">유량</h3>
+                <h3 className="panel-title">유량 (Flow Rate)</h3>
                 <div style={{display:'grid', gridTemplateColumns:'1fr', gap:'0.75rem'}}>
                   {FLOW_UNITS.map((item) => (
                     <div key={item.key} className="converter-input transition-all" style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.85rem 1rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', background:'white'}}>
-                      <input 
-                        type="text" 
-                        inputMode="decimal"
-                        value={flowValues[item.key]}
-                        onChange={(e) => handleUnitChange('flow', item.key, e.target.value)}
-                        placeholder="0"
-                        style={{flex:1, textAlign:'right', padding:'0', border:'none', outline:'none', fontSize:'1.25rem', fontWeight:800, color:'#2563eb', background:'transparent', width:'100%'}}
-                      />
+                      <input type="text" inputMode="decimal" value={flowValues[item.key]} onChange={(e) => handleUnitChange('flow', item.key, e.target.value)} placeholder="0" style={{flex:1, textAlign:'right', padding:'0', border:'none', outline:'none', fontSize:'1.25rem', fontWeight:800, color:'#2563eb', background:'transparent', width:'100%'}} />
                       <label style={{fontWeight:700, color:'#475569', width:'70px', textAlign:'left', flexShrink:0, fontSize:'0.95rem'}}>{item.label}</label>
                     </div>
                   ))}
                 </div>
-                <p style={{fontSize:'0.8rem', color:'#64748b', marginTop:'1rem', textAlign:'center'}}>
-                  * 질량 단위(g)는 <strong>물(밀도 1g/㎤)</strong>을 기준으로 산출됩니다.
-                </p>
+                <p style={{fontSize:'0.8rem', color:'#64748b', marginTop:'1rem', textAlign:'center'}}>* 1 ㎥/h = <strong>264.172 gal/h</strong> (미국 액체 갤런 기준)</p>
               </div>
-
-              {/* 압력 패널 */}
               <div className={`converter-panel ${converterType === 'pressure' ? 'active' : ''}`}>
-                <h3 className="panel-title">압력</h3>
+                <h3 className="panel-title">압력 (Pressure)</h3>
                 <div style={{display:'grid', gridTemplateColumns:'1fr', gap:'0.75rem'}}>
                   {PRESSURE_UNITS.map((item) => (
                     <div key={item.key} className="converter-input transition-all" style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.85rem 1rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', background:'white'}}>
-                      <input 
-                        type="text" 
-                        inputMode="decimal"
-                        value={pressureValues[item.key]}
-                        onChange={(e) => handleUnitChange('pressure', item.key, e.target.value)}
-                        placeholder="0"
-                        style={{flex:1, textAlign:'right', padding:'0', border:'none', outline:'none', fontSize:'1.25rem', fontWeight:800, color:'#2563eb', background:'transparent', width:'100%'}}
-                      />
+                      <input type="text" inputMode="decimal" value={pressureValues[item.key]} onChange={(e) => handleUnitChange('pressure', item.key, e.target.value)} placeholder="0" style={{flex:1, textAlign:'right', padding:'0', border:'none', outline:'none', fontSize:'1.25rem', fontWeight:800, color:'#2563eb', background:'transparent', width:'100%'}} />
                       <label style={{fontWeight:700, color:'#475569', width:'70px', textAlign:'left', flexShrink:0, fontSize:'0.95rem'}}>{item.label}</label>
                     </div>
                   ))}
                 </div>
               </div>
-
             </div>
           </section>
         )}
 
-        {/* 하단 판매 단가 테이블 (견적/사칙연산 공통) */}
         {(activeTab === 'forward' || activeTab === 'calc') && (
           <section style={{marginTop:'1.5rem'}}>
             <div style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', padding:'1.25rem', marginBottom:'1rem'}}>
@@ -637,27 +512,17 @@ function App() {
                   </select>
                 </div>
               </div>
-              
               <div className="converter-input transition-all" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'1rem 1.25rem', background:'#f8fafc', borderRadius:'0.75rem', border:'1px solid #cbd5e1'}}>
                 <div style={{fontSize:'0.9rem', fontWeight:700, color:'#475569'}}>단가표 기준 금액 (매입가) 직접 입력</div>
                 <div style={{display:'flex', alignItems:'center', flex:1, justifyContent:'flex-end'}}>
-                  <input 
-                    type="text" 
-                    inputMode="numeric"
-                    value={currentActivePriceDisplay ? formatNumber(currentActivePriceDisplay) : ''} 
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^\d]/g, '');
-                      if (activeTab === 'forward') setForwardPrice(val);
-                      else if (activeTab === 'calc') setCalcPrice(val);
-                    }}
-                    placeholder="0"
-                    style={{fontSize:'1.8rem', fontWeight:800, textAlign:'right', background:'transparent', border:'none', outline:'none', color:'#1e293b', width:'100%', maxWidth:'250px'}}
-                  />
+                  <input type="text" inputMode="numeric" value={currentActivePriceDisplay ? formatNumber(currentActivePriceDisplay) : ''} onChange={(e) => {
+                    const val = e.target.value.replace(/[^\d]/g, '');
+                    if (activeTab === 'forward') setForwardPrice(val); else if (activeTab === 'calc') setCalcPrice(val);
+                  }} placeholder="0" style={{fontSize:'1.8rem', fontWeight:800, textAlign:'right', background:'transparent', border:'none', outline:'none', color:'#1e293b', width:'100%', maxWidth:'250px'}} />
                   <span style={{fontSize:'1rem', color:'#64748b', marginLeft:'0.5rem', fontWeight:600}}>원 기준</span>
                 </div>
               </div>
             </div>
-
             {parseNum(currentActivePriceDisplay) > 0 && (
               <div style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', overflow:'hidden'}}>
                 <div style={{maxHeight:'60vh', overflowY:'auto'}}>
@@ -679,18 +544,13 @@ function App() {
                           <td style={{textAlign:'right', fontWeight:800, color:'#1e293b', fontSize:'1.1rem'}}>{formatNumber(row.sellingPrice)}</td>
                           <td style={{textAlign:'right', color:'#16a34a', fontSize:'0.9rem'}}>+{formatNumber(row.profit)}</td>
                           <td style={{textAlign:'center'}}>
-                            <button onClick={() => handleCopy(row.sellingPrice, row.index)} style={{padding:'0.4rem', borderRadius:'0.4rem', background: copiedRow===row.index?'#dcfce7':'#f1f5f9', color: copiedRow===row.index?'#16a34a':'#64748b', border:'none', cursor:'pointer'}}>
-                              {copiedRow===row.index ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                            </button>
+                            <button onClick={() => handleCopy(row.sellingPrice, row.index)} style={{padding:'0.4rem', borderRadius:'0.4rem', background: copiedRow===row.index?'#dcfce7':'#f1f5f9', color: copiedRow===row.index?'#16a34a':'#64748b', border:'none', cursor:'pointer'}}>{copiedRow===row.index ? <IconCheck size={16} /> : <IconCopy size={16} />}</button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  <button onClick={() => setShowHighMargin(!showHighMargin)} style={{width:'100%', padding:'1rem', background:'#f1f5f9', color:'#475569', fontWeight:700, border:'none', cursor:'pointer', transition:'background 0.1s'}}>
-                    {showHighMargin ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
-                    {showHighMargin ? '고가산 구간 접기' : '51% ~ 100% 구간 펼쳐보기'}
-                  </button>
+                  <button onClick={() => setShowHighMargin(!showHighMargin)} style={{width:'100%', padding:'1rem', background:'#f1f5f9', color:'#475569', fontWeight:700, border:'none', cursor:'pointer', transition:'background 0.1s'}}>{showHighMargin ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />} {showHighMargin ? '고가산 구간 접기' : '51% ~ 100% 구간 펼쳐보기'}</button>
                 </div>
               </div>
             )}
