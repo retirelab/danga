@@ -124,16 +124,19 @@ function App() {
   const [revSalesPrice, setRevSalesPrice] = useState('');
 
   const [converterType, setConverterType] = useState('flow');
-  const [flowValues, setFlowValues] = useState({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', gal_h: '', gal_min: '', gal_s: '' });
+  const [flowValues, setFlowValues] = useState({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', cc_h: '', cc_min: '', cc_s: '', gal_h: '', gal_min: '', gal_s: '' });
   const [pressureValues, setPressureValues] = useState({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
 
-  // 1 ㎥ = 264.172052 US Gallons
+  // 1 ㎥ = 264.172052 US Gallons, 1 ㎥ = 1,000,000 cc
   const FLOW_RATES = { 
     m3_h: 1, 
     m3_min: 1 / 60, 
     l_h: 1000, 
     l_min: 1000 / 60, 
     l_s: 1000 / 3600,
+    cc_h: 1000000,
+    cc_min: 1000000 / 60,
+    cc_s: 1000000 / 3600,
     gal_h: 264.172, 
     gal_min: 264.172 / 60, 
     gal_s: 264.172 / 3600
@@ -143,6 +146,7 @@ function App() {
   const FLOW_UNITS = [
     { key: 'm3_h', label: '㎥/h' }, { key: 'm3_min', label: '㎥/min' },
     { key: 'l_h', label: 'ℓ/h' }, { key: 'l_min', label: 'ℓ/min' }, { key: 'l_s', label: 'ℓ/s' },
+    { key: 'cc_h', label: 'cc/h' }, { key: 'cc_min', label: 'cc/min' }, { key: 'cc_s', label: 'cc/s' },
     { key: 'gal_h', label: 'gal/h' }, { key: 'gal_min', label: 'gal/min' }, { key: 'gal_s', label: 'gal/s' }
   ];
   const PRESSURE_UNITS = [
@@ -212,7 +216,7 @@ function App() {
 
     if (type === 'flow') {
       if (value === '') {
-        setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', gal_h: '', gal_min: '', gal_s: '' });
+        setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', cc_h: '', cc_min: '', cc_s: '', gal_h: '', gal_min: '', gal_s: '' });
         return;
       }
       const numValue = parseFloat(value);
@@ -242,7 +246,7 @@ function App() {
   };
 
   const resetConverter = () => {
-    if (converterType === 'flow') setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', gal_h: '', gal_min: '', gal_s: '' });
+    if (converterType === 'flow') setFlowValues({ m3_h: '', m3_min: '', l_h: '', l_s: '', l_min: '', cc_h: '', cc_min: '', cc_s: '', gal_h: '', gal_min: '', gal_s: '' });
     else setPressureValues({ m: '', bar: '', kgf_cm2: '', psi: '', mpa: '', kpa: '' });
   };
 
