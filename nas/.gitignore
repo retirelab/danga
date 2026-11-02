@@ -1,0 +1,6 @@
+/private/
+/private-template/config.php
+/private-template/catalog.json
+/state/
+/base.html
+*.zip
