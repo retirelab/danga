@@ -114,6 +114,12 @@ function App() {
   const [calcOperator, setCalcOperator] = useState('+');
   const [calcResult, setCalcResult] = useState(0);
   const [calcPrice, setCalcPrice] = useState('');
+  const calcError = useMemo(() => {
+    const values = calcInputs.slice(0, calcInputCount).filter(v => v.trim() !== '');
+    return calcOperator === '/' && values.slice(1).some(v => parseNum(v) === 0)
+      ? '0으로 나눌 수 없습니다. 나누는 값을 수정해 주세요.'
+      : '';
+  }, [calcInputs, calcOperator, calcInputCount]);
 
   const [copiedRow, setCopiedRow] = useState(null);
   const [roundingMethod, setRoundingMethod] = useState('floor'); // floor, round, ceil
@@ -177,6 +183,9 @@ function App() {
   }, [factoryPrice, factor1, factor2, factor3, useStep2, useStep3, basePriceType]);
 
   useEffect(() => {
+    if (calcError) {
+      setCalcResult(null); setCalcPrice(''); return;
+    }
     const validInputs = calcInputs.slice(0, calcInputCount).filter(v => v.trim() !== '');
     if (validInputs.length === 0) {
       setCalcResult(0); setCalcPrice(''); return;
@@ -188,11 +197,11 @@ function App() {
       if (calcOperator === '+') res += next;
       else if (calcOperator === '-') res -= next;
       else if (calcOperator === '*') res *= next;
-      else if (calcOperator === '/') res = next !== 0 ? res / next : res;
+      else if (calcOperator === '/') res /= next;
     }
     const roundedRes = Math.round(res);
     setCalcResult(roundedRes); setCalcPrice(roundedRes.toString());
-  }, [calcInputs, calcOperator, calcInputCount]);
+  }, [calcInputs, calcOperator, calcInputCount, calcError]);
 
   const handlePriceChange = (e, setter) => setter(e.target.value.replace(/[^\d]/g, ''));
   const handleFactorChange = (e, setter) => {
@@ -288,27 +297,20 @@ function App() {
   const rows = useMemo(() => {
     const activePrice = activeTab === 'forward' ? forwardPrice : calcPrice;
     const numericPrice = parseNum(activePrice);
-    if (!numericPrice) return [];
+    if (!numericPrice || (activeTab === 'calc' && calcError)) return [];
     const res = [];
     for (let i = 1; i <= 100; i++) {
       const multiplier = (100 + i) / 100;
-      let sellingPrice = Math.round(numericPrice * multiplier);
       const unit = parseInt(roundingUnit, 10);
-      
-      if (unit > 1) {
-        if (roundingMethod === 'floor') {
-          sellingPrice = Math.floor(sellingPrice / unit) * unit;
-        } else if (roundingMethod === 'round') {
-          sellingPrice = Math.round(sellingPrice / unit) * unit;
-        } else if (roundingMethod === 'ceil') {
-          sellingPrice = Math.ceil(sellingPrice / unit) * unit;
-        }
-      }
-      
+      // Apply the selected rule once, directly to the requested unit.
+      // Integer percentages avoid multiplying by an inexact decimal multiplier.
+      const scaledPrice = (numericPrice * (100 + i)) / (100 * unit);
+      const sellingPrice = Math[roundingMethod](scaledPrice) * unit;
+
       res.push({ index: i, multiplier: multiplier.toFixed(2), marginRate: i, sellingPrice, profit: sellingPrice - numericPrice });
     }
     return res;
-  }, [forwardPrice, calcPrice, activeTab, roundingUnit, roundingMethod]);
+  }, [forwardPrice, calcPrice, activeTab, roundingUnit, roundingMethod, calcError]);
 
   const currentActivePriceDisplay = activeTab === 'forward' ? forwardPrice : calcPrice;
 
@@ -466,9 +468,10 @@ function App() {
               </div>
               <div style={{background:'white', borderRadius:'0.5rem', padding:'0.75rem 1rem', display:'flex', alignItems:'center', justifyContent:'space-between', border:'1px solid #e2e8f0', minWidth:0}}>
                 <span style={{fontSize:'0.875rem', color:'#64748b', flexShrink:0}}>합산 결과</span>
-                <span style={{fontSize:'1.5rem', fontWeight:800, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{formatNumber(calcResult)}원</span>
+                <span style={{fontSize:'1.5rem', fontWeight:800, color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{calcError ? '계산 불가' : `${formatNumber(calcResult)}원`}</span>
               </div>
             </div>
+            {calcError && <p role="alert" style={{marginTop:'0.75rem', color:'#dc2626', fontSize:'0.9rem', fontWeight:600}}>{calcError}</p>}
           </section>
         )}
 
@@ -528,7 +531,7 @@ function App() {
                   </select>
                   <span style={{color:'#cbd5e1'}}>|</span>
                   <select value={roundingUnit} onChange={e => setRoundingUnit(e.target.value)} style={{background:'transparent', fontWeight:700, outline:'none', border:'none', cursor:'pointer', color:'#1e293b'}}>
-                    <option value="1">없음(1원)</option>
+                    <option value="1">1원</option>
                     <option value="10">10원</option>
                     <option value="100">100원</option>
                     <option value="1000">1,000원</option>
@@ -540,7 +543,7 @@ function App() {
               <div className="converter-input transition-all" style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'1rem 1.25rem', background:'#f8fafc', borderRadius:'0.75rem', border:'1px solid #cbd5e1'}}>
                 <div style={{fontSize:'0.9rem', fontWeight:700, color:'#475569'}}>단가표 기준 금액 (매입가) 직접 입력</div>
                 <div style={{display:'flex', alignItems:'center', flex:1, justifyContent:'flex-end'}}>
-                  <input type="text" inputMode="numeric" value={currentActivePriceDisplay ? formatNumber(currentActivePriceDisplay) : ''} onChange={(e) => {
+                  <input type="text" inputMode="numeric" disabled={activeTab === 'calc' && !!calcError} value={currentActivePriceDisplay ? formatNumber(currentActivePriceDisplay) : ''} onChange={(e) => {
                     const val = e.target.value.replace(/[^\d]/g, '');
                     if (activeTab === 'forward') setForwardPrice(val); else if (activeTab === 'calc') setCalcPrice(val);
                   }} placeholder="0" style={{fontSize:'1.8rem', fontWeight:800, textAlign:'right', background:'transparent', border:'none', outline:'none', color:'#1e293b', width:'100%', maxWidth:'250px'}} />
@@ -548,7 +551,7 @@ function App() {
                 </div>
               </div>
             </div>
-            {parseNum(currentActivePriceDisplay) > 0 && (
+            {parseNum(currentActivePriceDisplay) > 0 && !(activeTab === 'calc' && calcError) && (
               <div style={{background:'white', borderRadius:'1rem', border:'1px solid #e2e8f0', overflow:'hidden'}}>
                 <div style={{maxHeight:'60vh', overflowY:'auto'}}>
                   <table>
