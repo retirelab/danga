@@ -36,14 +36,29 @@
     $('count').textContent=`검색 ${matches.length}건 · 개정 ${catalog.revision || '-'}${matches.length>100?' · 처음 100건 표시':''}`;$('results').replaceChildren();
     matches.slice(0,100).forEach(item=>{const card=document.createElement('article');card.append(text('p',`${item.maker} · ${item.category || ''} · 적용 ${item.effective_date || '미등록'}`),text('h3',item.model),text('p',item.spec),text('p',item.status==='available'?`${item.price_type==='purchase'?'매입가':'정가/공장도가'} ${money(item.price_krw)} · 부가세 별도`:'본사 문의 / 적용 불가','money'));
       const doc=catalog.documents?.find(d=>d.id===item.document_id);const linked=doc && Number.isInteger(item.source_page) && item.source_page>0 && item.source_page<=doc.pages && item.source_sha256===doc.sha256;
-      if(linked){card.append(text('p',`${doc.title} · PDF ${item.source_page}쪽${item.printed_page?' · 인쇄 '+item.printed_page+'쪽':''}`));card.append(button('원본 PDF 대조'+(item.status==='available'?' 후 적용':''),()=>openPDF(doc,item.source_page,item)));}
+      if(linked){
+        card.append(text('p',`${doc.title} · PDF ${item.source_page}쪽${item.printed_page?' · 인쇄 '+item.printed_page+'쪽':''}`));
+        const actions=document.createElement('div');actions.className='actions';
+        if(item.status==='available' && item.verified){
+          const applyButton=button(money(item.price_krw)+' 바로 적용',()=>applyDirect(item,applyButton));actions.append(applyButton);
+        }
+        actions.append(button('원본 PDF ↗',()=>openPDFTab(doc,item.source_page)));card.append(actions);
+      }
       else card.append(text('p','원본 페이지 연결 전 · 가격 적용을 막았습니다.','badge'));
       if(!item.verified)card.append(text('p','추출값 검증 전 · 원본 확인만 가능합니다.','badge'));$('results').append(card);
     });
   }
   $('query').oninput=render;$('maker').onchange=render;
   function jump(){if(!blobURL)return;const page=Math.max(1,Math.min(currentDoc.pages,Number($('page').value)||1));$('page').value=page;const url=blobURL+'#page='+page+'&view=FitH';$('pdfFrame').src=url;$('pdfNew').href=url;$('confirmed').checked=false;$('apply').disabled=true;}
-  async function openPDFTab(doc){
+  async function applyDirect(item,control){
+    error('');control.disabled=true;
+    try{
+      const fresh=await (await request('select',{id:item.id,revision:catalog.revision,price:String(item.price_krw)})).json();
+      if(window.parent===window)throw new Error('GitHub 계산기의 단가표 버튼에서 열어 적용해 주세요.');
+      window.parent.postMessage({type:'danga:apply-price',version:1,item:fresh},PARENT);
+    }catch(e){error(e.message);}finally{control.disabled=false;}
+  }
+  async function openPDFTab(doc,page=1){
     error('');
     // Open synchronously during the click, before the authenticated fetch.
     const tab=window.open('about:blank','_blank');
@@ -53,7 +68,7 @@
     try{
       const response=await request('pdf',{id:doc.id});const blob=await response.blob();
       if(token!==loginToken || !token || tab.closed){if(!tab.closed)tab.close();return;}
-      const url=URL.createObjectURL(blob);externalPDFs.add(url);tab.location.replace(url+'#page=1&view=FitH');
+      const url=URL.createObjectURL(blob);externalPDFs.add(url);tab.location.replace(url+'#page='+page+'&view=FitH');
     }catch(e){if(!tab.closed)tab.close();error(e.message);}
   }
   async function openPDF(doc,page,item){error('');clearPDF();const ticket=pdfRequest;$('pdfTitle').textContent=doc.title;$('pdfMeta').textContent=`적용일 ${doc.effective_date || '-'} · ${doc.pages}쪽${item?' · '+item.model+' · '+item.spec+' · '+(item.status==='available'?money(item.price_krw):'문의'):''}`;
