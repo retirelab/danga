@@ -350,7 +350,7 @@ function App() {
         {nasSelection && <aside style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'0.75rem',padding:'1rem',marginBottom:'1rem'}}>
           <strong>{nasSelection.maker} · {nasSelection.model}</strong><p>{nasSelection.spec}</p>
           <p>원본 적용 당시 · {nasSelection.price_type==='purchase'?'매입가':'정가/공장도가'} {formatNumber(nasSelection.price_krw)}원 · 부가세 별도 · 적용일 {nasSelection.effective_date || '-'} · PDF {nasSelection.source_page}쪽 · 개정 {nasSelection.revision}</p>
-          <p style={{color:'#b45309'}}>{nasSelection.demo?'가상 샘플 · 실제 견적에 사용하지 마세요.':'등록 시 원본 대조를 마친 가격입니다.'} 할인계수를 1로 초기화했습니다. 업체 매입조건을 확인하세요.</p>
+          <p style={{color:'#b45309'}}>{nasSelection.demo?'가상 샘플 · 실제 견적에 사용하지 마세요.':nasSelection.verified?'등록 시 원본 대조를 마친 가격입니다.':'자동 추출 가격입니다. 견적 확정 전 원본과 사양을 확인하세요.'} 할인계수를 1로 초기화했습니다. 업체 매입조건을 확인하세요.</p>
           <button className="btn-outline" onClick={()=>{setNasSelection(null);setFactoryPrice('');setForwardPrice('');}}>적용 가격 지우기</button>
         </aside>}
 

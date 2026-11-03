@@ -12,7 +12,7 @@ window.NasCatalog = function NasCatalog({onApply}) {
     const receive=event=>{
       if(event.origin!==origin || event.source!==frame.current?.contentWindow)return;
       const message=event.data,item=message?.item;
-      if(message?.type!=='danga:apply-price' || message.version!==1 || !item || item.status!=='available' || !item.verified || !Number.isSafeInteger(item.price_krw) || item.price_krw<=0 || item.currency!=='KRW' || item.vat!=='excluded' || !['list','purchase'].includes(item.price_type) || !['maker','model','spec','id','revision','document_id','source_sha256'].every(k=>typeof item[k]==='string' && item[k].length<2000) || !Number.isInteger(item.source_page) || item.source_page<1)return;
+      if(message?.type!=='danga:apply-price' || message.version!==1 || !item || item.status!=='available' || !Number.isSafeInteger(item.price_krw) || item.price_krw<=0 || item.currency!=='KRW' || item.vat!=='excluded' || !['list','purchase'].includes(item.price_type) || !['maker','model','spec','id','revision','document_id','source_sha256'].every(k=>typeof item[k]==='string' && item[k].length<2000) || !Number.isInteger(item.source_page) || item.source_page<1)return;
       onApply(item);setOpen(false);
     };
     window.addEventListener('message',receive);

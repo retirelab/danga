@@ -86,7 +86,7 @@ try {
         $data=catalogData();$item=null;foreach($data['items'] as $candidate) if($candidate['id']===($_GET['id'] ?? ''))$item=$candidate;
         if(!$item || $item['status']!=='available') reply(['error'=>'적용 가능한 가격이 아닙니다.'],409);
         $doc=null;foreach($docs as $candidate)if($candidate['id']===($item['document_id'] ?? ''))$doc=$candidate;
-        if(!$doc || !is_int($item['source_page'] ?? null) || $item['source_page']<1 || $item['source_page']>$doc['pages'] || ($item['source_sha256'] ?? '')!==$doc['sha256'] || empty($item['verified'])) reply(['error'=>'원본 페이지와 검증이 연결되지 않은 가격입니다.'],409);
+        if(!$doc || !is_int($item['source_page'] ?? null) || $item['source_page']<1 || $item['source_page']>$doc['pages'] || ($item['source_sha256'] ?? '')!==$doc['sha256']) reply(['error'=>'원본 페이지가 연결되지 않은 가격입니다.'],409);
         if(($_GET['revision'] ?? '')!==($data['revision'] ?? '') || ($_GET['price'] ?? '')!==(string)$item['price_krw']) reply(['error'=>'조회 후 단가표가 변경되었습니다. 다시 검색해 주세요.'],409);
         $path=realpath($private.'/pdfs/'.$doc['file']);$root=realpath($private.'/pdfs');
         if(!$root || !$path || !str_starts_with($root,$private.DIRECTORY_SEPARATOR) || !str_starts_with($path,$root.DIRECTORY_SEPARATOR) || !hash_equals($doc['sha256'],hash_file('sha256',$path))) reply(['error'=>'원본 PDF를 다시 확인해 주세요.'],409);

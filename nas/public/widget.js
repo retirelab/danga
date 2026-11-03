@@ -38,13 +38,13 @@
       if(linked){
         card.append(text('p',`${doc.title} · PDF ${item.source_page}쪽${item.printed_page?' · 인쇄 '+item.printed_page+'쪽':''}`));
         const actions=document.createElement('div');actions.className='actions';
-        if(item.status==='available' && item.verified){
+        if(item.status==='available'){
           const applyButton=button(money(item.price_krw)+' 바로 적용',()=>applyDirect(item,applyButton));actions.append(applyButton);
         }
         actions.append(button('원본 PDF ↗',()=>openPDFTab(doc,item.source_page)));card.append(actions);
       }
       else card.append(text('p','원본 페이지 연결 전 · 가격 적용을 막았습니다.','badge'));
-      if(!item.verified)card.append(text('p','추출값 검증 전 · 원본 확인만 가능합니다.','badge'));$('results').append(card);
+      if(!item.verified)card.append(text('p','자동 추출 가격 · 견적 확정 전 원본 확인을 권장합니다.','badge'));$('results').append(card);
     });
   }
   $('query').oninput=render;$('maker').onchange=render;
@@ -73,7 +73,7 @@
   async function openPDF(doc,page,item){error('');clearPDF();const ticket=pdfRequest;$('pdfTitle').textContent=doc.title;$('pdfMeta').textContent=`적용일 ${doc.effective_date || '-'} · ${doc.pages}쪽${item?' · '+item.model+' · '+item.spec+' · '+(item.status==='available'?money(item.price_krw):'문의'):''}`;
     $('confirmLabel').hidden=true;$('apply').hidden=true;$('pdfDialog').showModal();
     try {const response=await request('pdf',{id:doc.id});const blob=await response.blob();if(!$('pdfDialog').open || ticket!==pdfRequest)return;blobURL=URL.createObjectURL(blob);currentDoc=doc;selected=item;$('page').max=doc.pages;$('page').value=page;jump();
-      const canApply=item?.status==='available' && item.verified && item.source_sha256===doc.sha256;$('confirmLabel').hidden=!canApply;$('apply').hidden=!canApply;
+      const canApply=item?.status==='available' && item.source_sha256===doc.sha256;$('confirmLabel').hidden=!canApply;$('apply').hidden=!canApply;
     }catch(e){if(ticket===pdfRequest){$('pdfDialog').close();error(e.message);}}
   }
   $('jump').onclick=jump;$('pdfClose').onclick=()=>$('pdfDialog').close();$('pdfDialog').addEventListener('close',clearPDF);

@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory(prefix='danga-service-') as d:
         code,data,headers=req('pdf&id=test',token);check(code==200 and data==pdf);check(headers['Content-Type']=='application/pdf');check('no-store' in headers['Cache-Control'])
         check(req('pdf&id=../../config',token)[0]==404)
         check(req('select&id=demo-1&revision=DEMO-001&price=1000000',token)[0]==200)
+        item['verified']=False;(private/'catalog.json').write_text(json.dumps(catalog));check(req('select&id=demo-1&revision=DEMO-001&price=1000000',token)[0]==200)
         check(req('select&id=demo-1&revision=old&price=1000000',token)[0]==409)
         check(req('select&id=demo-1&revision=DEMO-001&price=1',token)[0]==409)
         check(req('select&id=demo-2&revision=DEMO-001&price=1200000',token)[0]==409)
