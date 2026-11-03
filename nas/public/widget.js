@@ -3,6 +3,7 @@
   const PARENT='https://retirelab.github.io';
   const $=id=>document.getElementById(id);
   let pdfRequest=0;
+  let pdfTab=null, pdfTabRequest=0;
   const externalPDFs=new Set();
   let token='', catalog=null, blobURL='', selected=null, currentDoc=null;
   const error=message=>{$('error').textContent=message || '';};
@@ -60,7 +61,7 @@
     });
   }
   $('query').oninput=render;$('maker').onchange=render;
-  function jump(){if(!blobURL)return;const page=Math.max(1,Math.min(currentDoc.pages,Number($('page').value)||1));$('page').value=page;const url=blobURL+'#page='+page+'&view=FitH';$('pdfFrame').src=url;$('pdfNew').href=url;$('confirmed').checked=false;$('apply').disabled=true;}
+  function jump(){if(!blobURL)return;const page=Math.max(1,Math.min(currentDoc.pages,Number($('page').value)||1));$('page').value=page;const url=blobURL+'#page='+page+'&zoom=100';$('pdfFrame').src=url;$('pdfNew').href=url;$('confirmed').checked=false;$('apply').disabled=true;}
   async function applyDirect(item,control){
     error('');control.disabled=true;
     try{
@@ -72,16 +73,22 @@
   }
   async function openPDFTab(doc,page=1){
     error('');
-    // Open synchronously during the click, before the authenticated fetch.
-    const tab=window.open('about:blank','_blank');
+    const ticket=++pdfTabRequest;
+    const reused=pdfTab && !pdfTab.closed;
+    const tab=reused?pdfTab:window.open('about:blank','_blank');
     if(!tab){error('새 탭이 차단되었습니다. 이 사이트의 팝업을 허용한 뒤 다시 눌러주세요.');return;}
-    tab.opener=null;tab.document.title=doc.title;tab.document.body.textContent='원본 PDF를 불러오는 중입니다.';
+    pdfTab=tab;
+    if(!reused){tab.opener=null;tab.document.title=doc.title;tab.document.body.textContent='원본 PDF를 불러오는 중입니다.';}
+    tab.focus();
     const loginToken=token;
     try{
       const response=await request('pdf',{id:doc.id});const blob=await response.blob();
-      if(token!==loginToken || !token || tab.closed){if(!tab.closed)tab.close();return;}
-      const url=URL.createObjectURL(blob);externalPDFs.add(url);tab.location.replace(url+'#page='+page+'&view=FitH');
-    }catch(e){if(!tab.closed)tab.close();error(e.message);}
+      if(ticket!==pdfTabRequest)return;
+      if(token!==loginToken || !token || tab.closed){if(!reused && !tab.closed)tab.close();return;}
+      const url=URL.createObjectURL(blob);externalPDFs.add(url);
+      tab.location.href=url+'#page='+Math.max(1,Math.min(doc.pages,Number(page)||1))+'&zoom=100';
+      tab.focus();
+    }catch(e){if(ticket===pdfTabRequest){if(!reused && !tab.closed)tab.close();error(e.message);}}
   }
   async function openPDF(doc,page,item){error('');clearPDF();const ticket=pdfRequest;$('pdfTitle').textContent=doc.title;$('pdfMeta').textContent=`적용일 ${doc.effective_date || '-'} · ${doc.pages}쪽${item?' · '+item.model+' · '+item.spec+' · '+(item.status==='available'?money(item.price_krw):'문의'):''}`;
     $('confirmLabel').hidden=true;$('apply').hidden=true;$('pdfDialog').showModal();
