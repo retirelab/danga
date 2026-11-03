@@ -1,6 +1,7 @@
 // Tests the real public message receiver without a browser or network.
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
-const source=process.argv[2] || path.resolve(__dirname,'../../github/nas-catalog.js');
+const repoBridge=path.resolve(__dirname,'../../nas-catalog.js');
+const source=process.argv[2] || (fs.existsSync(repoBridge)?repoBridge:path.resolve(__dirname,'../../github/nas-catalog.js'));
 let listener,applied=[],closed=false;
 const frame={contentWindow:{}},dialog={showModal(){},close(){closed=true;}},trigger={focus(){}};
 const refs=[{current:frame},{current:dialog},{current:trigger}],effects=[];
