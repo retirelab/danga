@@ -1,0 +1,12 @@
+{
+  "documents": [
+    {
+      "id": "vendor-20260501",
+      "title": "업체 단가표 (예시)",
+      "file": "vendor-20260501.pdf",
+      "pages": 76,
+      "effective_date": "2026-05-01",
+      "sha256": "REPLACE_WITH_64_CHARACTER_SHA256"
+    }
+  ]
+}

@@ -4,3 +4,7 @@
 /state/
 /base.html
 *.zip
+
+/pdfs/
+/documents.json
+*.pdf

@@ -10,27 +10,9 @@ if ($action === 'login') {
     requirePost();
     $body = json_decode(file_get_contents('php://input', false, null, 0, 1024), true);
     $pin = is_array($body) && is_string($body['pin'] ?? null) ? $body['pin'] : '';
-    // One shared lock file, outside the web root. New cookies/IPs cannot reset it.
-    $handle = fopen($stateDir . '/login-attempts.json', 'c+');
-    if (!$handle || !flock($handle, LOCK_EX)) setupError();
-    $state = json_decode(stream_get_contents($handle),true);
-    if (!is_array($state)) $state = ['attempts'=>[], 'blocked_until'=>0];
+    require_once __DIR__ . '/pin-auth.php';
+    verifyPin($pin);
     $now = time();
-    if (($state['blocked_until'] ?? 0) > $now) {
-        header('Retry-After: ' . ($state['blocked_until'] - $now));
-        flock($handle, LOCK_UN); fclose($handle);
-        reply(['error'=>'반복 입력으로 잠겼습니다. 15분 후 다시 시도해 주세요.'],429);
-    }
-    if (!preg_match('/^[0-9]{4}$/D', $pin) || !password_verify($pin, $config['pin_hash'])) {
-        $attempts = array_values(array_filter($state['attempts'] ?? [],fn($t)=>is_int($t) && $t > $now-900));
-        $attempts[] = $now;
-        $state = ['attempts'=>$attempts, 'blocked_until'=>count($attempts)>=5 ? $now+900 : 0];
-        rewind($handle); ftruncate($handle,0); fwrite($handle,json_encode($state)); fflush($handle);
-        flock($handle, LOCK_UN); fclose($handle);
-        reply(['error'=>count($attempts)>=5 ? '5회 입력 실패로 15분간 잠겼습니다.' : '비밀번호가 일치하지 않습니다.'],count($attempts)>=5?429:401);
-    }
-    rewind($handle); ftruncate($handle,0); fwrite($handle,'{"attempts":[],"blocked_until":0}'); fflush($handle);
-    flock($handle, LOCK_UN); fclose($handle);
     session_regenerate_id(true);
     $_SESSION = ['csrf'=>bin2hex(random_bytes(32)), 'authenticated'=>true,'created'=>$now,'last_seen'=>$now,'pin_version'=>hash('sha256',$config['pin_hash'])];
     reply(['ok'=>true]);

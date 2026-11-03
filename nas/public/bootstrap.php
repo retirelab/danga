@@ -27,6 +27,8 @@ if (!is_dir($sessionDir) && !mkdir($sessionDir, 0700, true)) setupError();
 $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 // Never trust X-Forwarded-Proto from arbitrary clients. Configure HTTPS at Web Station.
 if (!$secure && empty($config['allow_http_local_test'])) reply(['error'=>'HTTPS 주소로 접속해 주세요.'], 400);
+$authenticated = false;
+if (!defined('DANGA_SERVICE')) {
 ini_set('session.use_strict_mode','1');
 ini_set('session.use_only_cookies','1');
 ini_set('session.gc_maxlifetime', '28800');
@@ -41,6 +43,7 @@ $authenticated = !empty($_SESSION['authenticated'])
     && $now - ($_SESSION['created'] ?? 0) < 28800
     && hash_equals($_SESSION['pin_version'] ?? '', hash('sha256', $config['pin_hash']));
 if (!$authenticated) unset($_SESSION['authenticated']);
+}
 function requireAuth(): void {
     global $authenticated;
     if (!$authenticated) reply(['error'=>'로그인이 필요하거나 만료되었습니다.'],401);
