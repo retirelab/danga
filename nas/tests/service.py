@@ -48,7 +48,8 @@ with tempfile.TemporaryDirectory(prefix='danga-service-') as d:
         manifest['documents'][0]['file']='../config.php';(private/'documents.json').write_text(json.dumps(manifest));check(req('pdf&id=test',token)[0]==404)
         manifest['documents'][0]['file']='test.pdf';(private/'documents.json').write_text(json.dumps(manifest))
         check(req('logout',token,body={})[0]==200);check(req('catalog',token)[0]==401)
-        token=json.loads(req('login',body={'pin':pin})[1])['token'];record=private/'state/tokens'/ (hashlib.sha256(token.encode()).hexdigest()+'.json');state=json.loads(record.read_text());state['last_seen']=1;record.write_text(json.dumps(state));check(req('catalog',token)[0]==401)
+        token=json.loads(req('login',body={'pin':pin})[1])['token'];record=private/'state/tokens'/ (hashlib.sha256(token.encode()).hexdigest()+'.json');state=json.loads(record.read_text());state['last_seen']=1;state['created']=1;record.write_text(json.dumps(state));check(req('catalog',token)[0]==200)
+        state.pop('tab_session');record.write_text(json.dumps(state));check(req('catalog',token)[0]==401)
         token=json.loads(req('login',body={'pin':pin})[1])['token'];(private/'config.php').write_text(config.replace(hashed,hashed+'changed'));check(req('catalog',token)[0]==401);(private/'config.php').write_text(config)
         wrong='0000' if pin!='0000' else '0001'
         for i in range(5):check(req('login',body={'pin':wrong})[0]==(429 if i==4 else 401))

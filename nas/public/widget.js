@@ -4,24 +4,23 @@
   const $=id=>document.getElementById(id);
   let pdfRequest=0;
   const externalPDFs=new Set();
-  let token='', catalog=null, blobURL='', selected=null, currentDoc=null, idleTimer, maxTimer;
+  let token='', catalog=null, blobURL='', selected=null, currentDoc=null;
   const error=message=>{$('error').textContent=message || '';};
   const money=n=>new Intl.NumberFormat('ko-KR').format(n)+'원';
   const text=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;};
   const button=(label,handler)=>{const e=text('button',label);e.type='button';e.addEventListener('click',handler);return e;};
   function clearPDF(){pdfRequest++; $('pdfFrame').removeAttribute('src');$('pdfNew').removeAttribute('href');if(blobURL)URL.revokeObjectURL(blobURL);blobURL='';selected=null;currentDoc=null;$('confirmed').checked=false;$('apply').disabled=true; }
-  function reset(){for(const url of externalPDFs)URL.revokeObjectURL(url);externalPDFs.clear();token='';catalog=null;clearTimeout(idleTimer);clearTimeout(maxTimer);clearPDF();if($('pdfDialog').open)$('pdfDialog').close();$('results').replaceChildren();$('documents').replaceChildren();$('catalog').hidden=true;$('login').hidden=false;$('lock').hidden=true;$('pin').value='';}
-  function touch(){clearTimeout(idleTimer);idleTimer=setTimeout(()=>lock('30분 동안 요청이 없어 잠겼습니다.'),1800000);}
+  function reset(){for(const url of externalPDFs)URL.revokeObjectURL(url);externalPDFs.clear();token='';catalog=null;clearPDF();if($('pdfDialog').open)$('pdfDialog').close();$('results').replaceChildren();$('documents').replaceChildren();$('catalog').hidden=true;$('login').hidden=false;$('lock').hidden=true;$('pin').value='';}
   async function request(action,params={},body){
     const response=await fetch('service.php?'+new URLSearchParams({action,...params}),{method:body?'POST':'GET',cache:'no-store',credentials:'omit',headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
     if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status===401 && action!=='login')reset();throw new Error(data.error || 'NAS 요청에 실패했습니다.');}
-    if(token)touch();return response;
+    return response;
   }
   async function lock(message='잠겼습니다.') {const old=token;reset();error(message);if(old)await fetch('service.php?action=logout',{method:'POST',credentials:'omit',headers:{Authorization:'Bearer '+old},keepalive:true}).catch(()=>{});}
   $('lock').onclick=()=>lock();
   $('pin').oninput=()=>{$('pin').value=$('pin').value.replace(/[^0-9]/g,'').slice(0,4);};
   $('login').onsubmit=async e=>{e.preventDefault();error('');const submit=e.submitter;submit.disabled=true;
-    try {const data=await (await request('login',{}, {pin:$('pin').value})).json();$('pin').value='';token=data.token;touch();maxTimer=setTimeout(()=>lock('로그인 유효시간이 지났습니다.'),28800000);
+    try {const data=await (await request('login',{}, {pin:$('pin').value})).json();$('pin').value='';token=data.token;
       catalog=await (await request('catalog')).json();$('login').hidden=true;$('catalog').hidden=false;$('lock').hidden=false;
       $('maker').replaceChildren(new Option('전체 업체',''));[...new Set(catalog.items.map(i=>i.maker))].sort().forEach(m=>$('maker').add(new Option(m,m)));
       $('demo').textContent=catalog.demo?'가상 샘플입니다. 실제 견적에 사용하지 마세요.':'';

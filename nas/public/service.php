@@ -15,11 +15,11 @@ if ($action==='login') {
     $body=json_decode(file_get_contents('php://input',false,null,0,1024),true);
     verifyPin(is_array($body) && is_string($body['pin'] ?? null) ? $body['pin'] : '');
     $token=bin2hex(random_bytes(32));
-    $record=['created'=>time(),'last_seen'=>time(),'version'=>hash('sha256',$config['pin_hash'])];
+    $record=['tab_session'=>true,'created'=>time(),'last_seen'=>time(),'version'=>hash('sha256',$config['pin_hash'])];
     if (file_put_contents($tokenDir.'/'.hash('sha256',$token).'.json',json_encode($record),LOCK_EX)===false) setupError();
     // Prune expired token records; never store the raw token on disk or in a URL.
-    foreach (glob($tokenDir.'/*.json') ?: [] as $old) if (filemtime($old)<time()-28800) unlink($old);
-    reply(['token'=>$token,'idle_seconds'=>1800,'max_seconds'=>28800]);
+    foreach (glob($tokenDir.'/*.json') ?: [] as $old) if (filemtime($old)<time()-28800) { $legacy=json_decode(file_get_contents($old),true); if(empty($legacy['tab_session'])) unlink($old); }
+    reply(['token'=>$token,'tab_session'=>true]);
 }
 $authorization=$_SERVER['HTTP_AUTHORIZATION'] ?? '';
 if (!preg_match('/^Bearer ([a-f0-9]{64})$/D',$authorization,$parts)) reply(['error'=>'단가표 잠금을 해제해 주세요.'],401);
@@ -27,7 +27,7 @@ $tokenFile=$tokenDir.'/'.hash('sha256',$parts[1]).'.json';
 $handle=is_file($tokenFile) ? fopen($tokenFile,'r+') : false;
 if (!$handle || !flock($handle,LOCK_EX)) reply(['error'=>'로그인이 만료되었습니다.'],401);
 $record=json_decode(stream_get_contents($handle),true);
-$valid=is_array($record) && time()-($record['last_seen'] ?? 0)<1800 && time()-($record['created'] ?? 0)<28800 && hash_equals($record['version'] ?? '',hash('sha256',$config['pin_hash']));
+$valid=is_array($record) && (!empty($record['tab_session']) || (time()-($record['last_seen'] ?? 0)<1800 && time()-($record['created'] ?? 0)<28800)) && hash_equals($record['version'] ?? '',hash('sha256',$config['pin_hash']));
 if (!$valid) {flock($handle,LOCK_UN);fclose($handle);unlink($tokenFile);reply(['error'=>'로그인이 만료되었습니다.'],401);}
 if ($action==='logout') {
     if ($_SERVER['REQUEST_METHOD']!=='POST') reply(['error'=>'허용되지 않은 요청입니다.'],405);
