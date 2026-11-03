@@ -1,0 +1,22 @@
+// Tests the real public message receiver without a browser or network.
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
+const source=process.argv[2] || path.resolve(__dirname,'../../github/nas-catalog.js');
+let listener,applied=[],closed=false;
+const frame={contentWindow:{}},dialog={showModal(){},close(){closed=true;}},trigger={focus(){}};
+const refs=[{current:frame},{current:dialog},{current:trigger}],effects=[];
+const React={useState:()=>[true,()=>{}],useRef:()=>refs.shift(),useEffect:f=>effects.push(f),createElement:(type,props,...children)=>({type,props,children}),Fragment:'fragment'};
+const window={addEventListener:(name,fn)=>{if(name==='message')listener=fn;},removeEventListener:()=>{listener=null;}};
+vm.runInNewContext(fs.readFileSync(source,'utf8'),{window,React});
+window.NasCatalog({onApply:i=>applied.push(i)});const cleanup=effects[0]();
+const item={id:'test',maker:'Fictional',model:'TEST',spec:'2.2kW',price_krw:1000000,currency:'KRW',vat:'excluded',price_type:'list',status:'available',verified:true,revision:'test',document_id:'test',source_sha256:'0'.repeat(64),source_page:1};
+const message={type:'danga:apply-price',version:1,item};
+const send=(data=message,origin='https://danga.onsnas83.diskstation.me',source=frame.contentWindow)=>listener({data,origin,source});
+send(message,'https://evil.example');assert.equal(applied.length,0);
+send(message,undefined,{});assert.equal(applied.length,0);
+for(const change of [{price_krw:NaN},{price_krw:1.5},{price_krw:-1},{price_krw:1e20},{verified:false},{currency:'USD'},{vat:'included'},{status:'inquiry'},{source_page:0},{model:123}])send({...message,item:{...item,...change}});
+assert.equal(applied.length,0);
+send({...message,version:2});assert.equal(applied.length,0);
+send();assert.equal(applied.length,1);assert.equal(applied[0].price_krw,1000000);
+send({...message,item:{...item,price_type:'purchase'}});assert.equal(applied.length,2);
+cleanup();assert.equal(listener,null);assert(closed);
+console.log('PASS: bridge rejects wrong origin/window/schema and accepts validated list/purchase selections');

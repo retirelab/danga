@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "demo": true,
+  "revision": "DEMO-001",
+  "items": [
+    {"id":"demo-1","maker":"가상업체","category":"가상 펌프","model":"DEMO 10-3","spec":"가상 예시 · 2.2kW · 모터 포함","price_krw":1000000,"currency":"KRW","vat":"excluded","price_type":"list","status":"available","effective_date":"2026-01-01","source_page":1},
+    {"id":"demo-2","maker":"가상업체","category":"가상 펌프","model":"DEMO 10-3","spec":"가상 예시 · 3.7kW · 모터 포함","price_krw":1200000,"currency":"KRW","vat":"excluded","price_type":"list","status":"available","effective_date":"2026-01-01","source_page":1},
+    {"id":"demo-3","maker":"가상업체","category":"가상 부품","model":"DEMO-SEAL","spec":"가상 예시 · 문의 제품","price_krw":null,"currency":"KRW","vat":"excluded","price_type":"list","status":"inquiry","effective_date":"2026-01-01","source_page":2}
+  ]
+}

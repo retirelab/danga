@@ -55,6 +55,7 @@
 </head>
 <body>
 <div id="root"></div>
+<script src="nas-catalog.js?v=0.2.0"></script>
 <script type="text/babel">
 const { useState, useEffect, useMemo } = React;
 
@@ -89,6 +90,7 @@ const IconRepeat = ({size}) => <Icon size={size} d={["M17 1l4 4-4 4", "M3 11V9a4
 function App() {
   const [activeTab, setActiveTab] = useState('forward');
   const [makers, setMakers] = useState(DEFAULT_MAKERS);
+  const [nasSelection, setNasSelection] = useState(null);
 
   const formatNumber = (num) => new Intl.NumberFormat('ko-KR').format(num);
   const parseNum = (str) => {
@@ -179,7 +181,7 @@ function App() {
     if (basePriceType === 'step1') targetPrice = s1;
     else if (basePriceType === 'step2') targetPrice = s2;
     if (numFactory > 0) setForwardPrice(targetPrice.toString());
-    else setForwardPrice('');
+    else if (!(nasSelection?.price_type==='purchase' && selectedMaker==='nas-direct')) setForwardPrice('');
   }, [factoryPrice, factor1, factor2, factor3, useStep2, useStep3, basePriceType]);
 
   useEffect(() => {
@@ -271,6 +273,7 @@ function App() {
   };
 
   const updateCurrentMaker = () => {
+    if(selectedMaker==='nas-direct') return;
     const updated = makers.map(m => m.id === selectedMaker ? { ...m, factor1, factor2, factor3, useStep2, useStep3 } : m);
     setMakers(updated);
     localStorage.setItem('calculatorMakers', JSON.stringify(updated));
@@ -278,7 +281,7 @@ function App() {
   };
 
   const deleteMaker = () => {
-    if (makers.length <= 1) return;
+    if (makers.length <= 1 || selectedMaker==='nas-direct') return;
     const updated = makers.filter(m => m.id !== selectedMaker);
     setMakers(updated);
     localStorage.setItem('calculatorMakers', JSON.stringify(updated));
@@ -319,7 +322,13 @@ function App() {
       <header style={{background:'white', boxShadow:'0 1px 2px rgba(0,0,0,0.07)', position:'sticky', top:0, zIndex:30}}>
         <div style={{maxWidth:'56rem', margin:'0 auto', padding:'1rem', display:'flex', alignItems:'center', gap:'0.75rem'}}>
           <div style={{background:'#2563eb', padding:'0.5rem', borderRadius:'0.5rem', color:'white', display:'flex'}}><IconCalculator size={24} /></div>
-          <h1 style={{fontSize:'1.25rem', fontWeight:800, color:'#1e293b'}}>단가 계산기 Pro</h1>
+          <h1 style={{fontSize:'1.25rem', fontWeight:800, color:'#1e293b'}}>단가 계산기 Pro <small style={{fontSize:'0.65rem',color:'#64748b'}}>v0.2.0</small></h1>
+          <NasCatalog onApply={item=>{
+            setNasSelection(item);setSelectedMaker('nas-direct');
+            setFactor1('1');setFactor2('1');setFactor3('1');setUseStep2(false);setUseStep3(false);setBasePriceType('step1');
+            setFactoryPrice(item.price_type==='list'?String(item.price_krw):'');
+            setForwardPrice(String(item.price_krw));setActiveTab('forward');
+          }} />
         </div>
         <div style={{maxWidth:'56rem', margin:'0 auto', display:'flex', overflowX:'auto', padding:'0 1rem', borderBottom:'1px solid #e2e8f0'}}>
           {[
@@ -338,6 +347,13 @@ function App() {
       </header>
 
       <main style={{maxWidth:'56rem', margin:'0 auto', padding:'0 1rem', marginTop:'1.5rem'}}>
+        {nasSelection && <aside style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'0.75rem',padding:'1rem',marginBottom:'1rem'}}>
+          <strong>{nasSelection.maker} · {nasSelection.model}</strong><p>{nasSelection.spec}</p>
+          <p>원본 적용 당시 · {nasSelection.price_type==='purchase'?'매입가':'정가/공장도가'} {formatNumber(nasSelection.price_krw)}원 · 부가세 별도 · 적용일 {nasSelection.effective_date || '-'} · PDF {nasSelection.source_page}쪽 · 개정 {nasSelection.revision}</p>
+          <p style={{color:'#b45309'}}>{nasSelection.demo?'가상 샘플 · 실제 견적에 사용하지 마세요.':'원본 대조 확인 후 적용했습니다.'} 할인계수를 1로 초기화했습니다. 업체 매입조건을 확인하세요.</p>
+          <button className="btn-outline" onClick={()=>{setNasSelection(null);setFactoryPrice('');setForwardPrice('');}}>적용 가격 지우기</button>
+        </aside>}
+
         {activeTab === 'forward' && (
           <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
             <section style={{background:'white', borderRadius:'1rem', border:'1px solid #e0e7ff', overflow:'hidden'}}>
@@ -361,6 +377,7 @@ function App() {
                           setUseStep2(m.useStep2 !== false); setUseStep3(m.useStep2 !== false && m.useStep3 !== false);
                         }
                       }} style={{flex:1, padding:'0.5rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', fontWeight:600}}>
+                        <option value="nas-direct" disabled>NAS 단가표 적용 · 매입조건 확인</option>
                         {makers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
                       <button onClick={updateCurrentMaker} style={{background: saveFlash?'#10b981':'#d1fae5', color:saveFlash?'white':'#047857', padding:'0.5rem 1rem', borderRadius:'0.5rem', fontWeight:600, border:'none', cursor:'pointer'}}>
@@ -374,7 +391,7 @@ function App() {
                 <div style={{marginBottom:'1.5rem'}}>
                   <label style={{display:'block', fontSize:'0.875rem', fontWeight:600, color:'#475569', marginBottom:'0.5rem'}}>단가표 정가 (List Price)</label>
                   <div style={{position:'relative', display:'flex', alignItems:'center'}}>
-                    <input type="text" value={factoryPrice ? formatNumber(factoryPrice) : ''} onChange={e => handlePriceChange(e, setFactoryPrice)}
+                    <input type="text" value={factoryPrice ? formatNumber(factoryPrice) : ''} onChange={e => {setNasSelection(null);handlePriceChange(e, setFactoryPrice);}}
                       style={{width:'100%', fontSize:'1.5rem', fontWeight:700, textAlign:'right', padding:'0.75rem 3rem 0.75rem 1rem', border:'1px solid #cbd5e1', borderRadius:'0.75rem', outline:'none'}} />
                     <span style={{position:'absolute', right:'1rem', color:'#64748b', fontWeight:700}}>원</span>
                   </div>
@@ -593,3 +610,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
+
