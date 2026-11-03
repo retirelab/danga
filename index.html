@@ -181,8 +181,9 @@ function App() {
     if (basePriceType === 'step1') targetPrice = s1;
     else if (basePriceType === 'step2') targetPrice = s2;
     if (numFactory > 0) setForwardPrice(targetPrice.toString());
-    else if (!(nasSelection?.price_type==='purchase' && selectedMaker==='nas-direct')) setForwardPrice('');
-  }, [factoryPrice, factor1, factor2, factor3, useStep2, useStep3, basePriceType]);
+    else if (nasSelection?.price_type==='purchase') setForwardPrice(String(nasSelection.price_krw));
+    else setForwardPrice('');
+  }, [factoryPrice, factor1, factor2, factor3, useStep2, useStep3, basePriceType, nasSelection]);
 
   useEffect(() => {
     if (calcError) {
@@ -273,7 +274,6 @@ function App() {
   };
 
   const updateCurrentMaker = () => {
-    if(selectedMaker==='nas-direct') return;
     const updated = makers.map(m => m.id === selectedMaker ? { ...m, factor1, factor2, factor3, useStep2, useStep3 } : m);
     setMakers(updated);
     localStorage.setItem('calculatorMakers', JSON.stringify(updated));
@@ -281,7 +281,7 @@ function App() {
   };
 
   const deleteMaker = () => {
-    if (makers.length <= 1 || selectedMaker==='nas-direct') return;
+    if (makers.length <= 1) return;
     const updated = makers.filter(m => m.id !== selectedMaker);
     setMakers(updated);
     localStorage.setItem('calculatorMakers', JSON.stringify(updated));
@@ -324,8 +324,7 @@ function App() {
           <div style={{background:'#2563eb', padding:'0.5rem', borderRadius:'0.5rem', color:'white', display:'flex'}}><IconCalculator size={24} /></div>
           <h1 style={{fontSize:'1.25rem', fontWeight:800, color:'#1e293b'}}>단가 계산기 Pro <small style={{fontSize:'0.65rem',color:'#64748b'}}>v0.2.0</small></h1>
           <NasCatalog onApply={item=>{
-            setNasSelection(item);setSelectedMaker('nas-direct');
-            setFactor1('1');setFactor2('1');setFactor3('1');setUseStep2(false);setUseStep3(false);setBasePriceType('step1');
+            setNasSelection(item);
             setFactoryPrice(item.price_type==='list'?String(item.price_krw):'');
             setForwardPrice(String(item.price_krw));setActiveTab('forward');
           }} />
@@ -350,7 +349,7 @@ function App() {
         {nasSelection && <aside style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'0.75rem',padding:'1rem',marginBottom:'1rem'}}>
           <strong>{nasSelection.maker} · {nasSelection.model}</strong><p>{nasSelection.spec}</p>
           <p>원본 적용 당시 · {nasSelection.price_type==='purchase'?'매입가':'정가/공장도가'} {formatNumber(nasSelection.price_krw)}원 · 부가세 별도 · 적용일 {nasSelection.effective_date || '-'} · PDF {nasSelection.source_page}쪽 · 개정 {nasSelection.revision}</p>
-          <p style={{color:'#b45309'}}>{nasSelection.demo?'가상 샘플 · 실제 견적에 사용하지 마세요.':nasSelection.verified?'등록 시 원본 대조를 마친 가격입니다.':'자동 추출 가격입니다. 견적 확정 전 원본과 사양을 확인하세요.'} 할인계수를 1로 초기화했습니다. 업체 매입조건을 확인하세요.</p>
+          <p style={{color:'#b45309'}}>{nasSelection.demo?'가상 샘플 · 실제 견적에 사용하지 마세요.':nasSelection.verified?'등록 시 원본 대조를 마친 가격입니다.':'자동 추출 가격입니다. 견적 확정 전 원본과 사양을 확인하세요.'} {nasSelection.price_type==='purchase'?'매입가를 직접 적용했습니다. 할인계수 설정은 유지됩니다.':'현재 설정한 할인계수와 기준 단계를 적용했습니다.'}</p>
           <button className="btn-outline" onClick={()=>{setNasSelection(null);setFactoryPrice('');setForwardPrice('');}}>적용 가격 지우기</button>
         </aside>}
 
@@ -377,7 +376,6 @@ function App() {
                           setUseStep2(m.useStep2 !== false); setUseStep3(m.useStep2 !== false && m.useStep3 !== false);
                         }
                       }} style={{flex:1, padding:'0.5rem', border:'1px solid #cbd5e1', borderRadius:'0.5rem', fontWeight:600}}>
-                        <option value="nas-direct" disabled>NAS 단가표 적용 · 매입조건 확인</option>
                         {makers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
                       <button onClick={updateCurrentMaker} style={{background: saveFlash?'#10b981':'#d1fae5', color:saveFlash?'white':'#047857', padding:'0.5rem 1rem', borderRadius:'0.5rem', fontWeight:600, border:'none', cursor:'pointer'}}>
