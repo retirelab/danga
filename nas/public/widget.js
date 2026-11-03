@@ -30,10 +30,22 @@
     }catch(e){if(token)reset();error(e.message);}finally{submit.disabled=false;}
   };
   const norm=s=>String(s || '').toUpperCase().replace(/[\s-]/g,'');
+  // Field model: controller series + number of pumps + pump model.
+  function systemAlias(item){
+    const series=String(item.category || '').match(/^(NSQP|NSQ|XQP|IOP|N747D)\b/i)?.[1]?.toUpperCase();
+    const count=String(item.spec || '').match(/\b([2-6])\s*Pump\b/i)?.[1];
+    const pump=String(item.model || '').replace(/\s+/g,'').toUpperCase();
+    return series && count && /^XRL[0-9]/.test(pump) ? `${series}-${count}${pump}` : '';
+  }
+  function matchesQuery(item,query){
+    const needle=norm(query),alias=systemAlias(item);
+    if(/^(NSQP|NSQ|XQP|IOP|N747D)[2-6]XRL/.test(needle))return norm(alias)===needle;
+    return norm([alias,item.maker,item.model,item.spec,item.category].join(' ')).includes(needle);
+  }
   function render(){
-    if(!catalog)return;const matches=catalog.items.filter(i=>(!$('maker').value || i.maker===$('maker').value) && norm([i.maker,i.model,i.spec,i.category].join(' ')).includes(norm($('query').value)));
+    if(!catalog)return;const matches=catalog.items.filter(i=>(!$('maker').value || i.maker===$('maker').value) && matchesQuery(i,$('query').value));
     $('count').textContent=`검색 ${matches.length}건 · 개정 ${catalog.revision || '-'}${matches.length>100?' · 처음 100건 표시':''}`;$('results').replaceChildren();
-    matches.slice(0,100).forEach(item=>{const card=document.createElement('article');card.append(text('p',`${item.maker} · ${item.category || ''} · 적용 ${item.effective_date || '미등록'}`),text('h3',item.model),text('p',item.spec),text('p',item.status==='available'?`${item.price_type==='purchase'?'매입가':'정가/공장도가'} ${money(item.price_krw)} · 부가세 별도`:'본사 문의 / 적용 불가','money'));
+    matches.slice(0,100).forEach(item=>{const card=document.createElement('article');card.append(text('p',`${item.maker} · ${item.category || ''} · 적용 ${item.effective_date || '미등록'}`),text('h3',systemAlias(item) || item.model),text('p',item.spec),text('p',item.status==='available'?`${item.price_type==='purchase'?'매입가':'정가/공장도가'} ${money(item.price_krw)} · 부가세 별도`:'본사 문의 / 적용 불가','money'));
       const doc=catalog.documents?.find(d=>d.id===item.document_id);const linked=doc && Number.isInteger(item.source_page) && item.source_page>0 && item.source_page<=doc.pages && item.source_sha256===doc.sha256;
       if(linked){
         card.append(text('p',`${doc.title} · PDF ${item.source_page}쪽${item.printed_page?' · 인쇄 '+item.printed_page+'쪽':''}`));
@@ -53,6 +65,7 @@
     error('');control.disabled=true;
     try{
       const fresh=await (await request('select',{id:item.id,revision:catalog.revision,price:String(item.price_krw)})).json();
+      const alias=systemAlias(fresh);if(alias){fresh.pump_model=fresh.model;fresh.model=alias;}
       if(window.parent===window)throw new Error('GitHub 계산기의 단가표 버튼에서 열어 적용해 주세요.');
       window.parent.postMessage({type:'danga:apply-price',version:1,item:fresh},PARENT);
     }catch(e){error(e.message);}finally{control.disabled=false;}
