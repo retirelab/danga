@@ -1,0 +1,45 @@
+import {getDocument,GlobalWorkerOptions} from './vendor/pdfjs/legacy/build/pdf.min.js';
+GlobalWorkerOptions.workerSrc=new URL('./vendor/pdfjs/legacy/build/pdf.worker.min.js',import.meta.url).href;
+const $=id=>document.getElementById(id);
+let pdf=null,loading=null,renderTask=null,pageNumber=1,scale=1,fit=true,revision=0,source=null,loadVersion=0;
+const origin=location.origin;
+function status(message){$('status').textContent=message;}
+async function render(){
+  if(!pdf)return;const ticket=++revision;
+  if(renderTask){renderTask.cancel();renderTask=null;}
+  try{
+    const page=await pdf.getPage(pageNumber);if(ticket!==revision)return;
+    const natural=page.getViewport({scale:1});
+    const width=Math.max(200,document.documentElement.clientWidth-(innerWidth<600?12:24));
+    if(fit)scale=Math.min(1,width/natural.width);
+    // Limit backing canvas memory on mobile; CSS size remains the chosen zoom.
+    const viewport=page.getViewport({scale});const ratio=Math.min(devicePixelRatio||1,2,4096/viewport.width,6000/viewport.height);
+    const canvas=$('canvas');canvas.width=Math.floor(viewport.width*ratio);canvas.height=Math.floor(viewport.height*ratio);canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';canvas.style.display='inline-block';
+    $('page').value=pageNumber;$('page').max=pdf.numPages;$('total').textContent=pdf.numPages;$('zoom').textContent=Math.round(scale*100)+'%';$('prev').disabled=pageNumber<=1;$('next').disabled=pageNumber>=pdf.numPages;
+    status('원본을 표시하는 중입니다…');
+    renderTask=page.render({canvasContext:canvas.getContext('2d'),viewport,transform:[ratio,0,0,ratio,0,0]});await renderTask.promise;
+    if(ticket===revision){renderTask=null;status('원본 '+pageNumber+' / '+pdf.numPages+'쪽');}
+  }catch(e){if(ticket===revision && e.name!=='RenderingCancelledException')status('PDF 표시 실패: '+e.message);}
+}
+async function load(message){
+  const generation=++loadVersion;
+  ++revision;if(renderTask){renderTask.cancel();renderTask=null;}
+  if(loading)await loading.destroy();if(generation!==loadVersion)return;pdf=null;status('원본 PDF를 불러오는 중입니다…');
+  document.title=message.title || '단가표 원본';$('title').textContent=document.title;
+  try{
+    const task=getDocument({data:new Uint8Array(message.data),isEvalSupported:false,cMapUrl:new URL('./vendor/pdfjs/cmaps/',import.meta.url).href,cMapPacked:true,standardFontDataUrl:new URL('./vendor/pdfjs/standard_fonts/',import.meta.url).href,wasmUrl:new URL('./vendor/pdfjs/wasm/',import.meta.url).href});
+    loading=task;const documentPDF=await task.promise;if(loading!==task)return;pdf=documentPDF;pageNumber=Math.max(1,Math.min(pdf.numPages,Number(message.page)||1));fit=true;await render();
+  }catch(e){status('PDF를 열지 못했습니다: '+e.message);}
+}
+window.addEventListener('message',event=>{
+  if(event.origin!==origin || !event.source)return;
+  if(event.data?.type==='danga:pdf-ping'){
+    if(source && event.source!==source)return;source=event.source;source.postMessage({type:'danga:pdf-ready'},origin);return;
+  }
+  if(event.source===source && event.data?.type==='danga:pdf-data' && event.data.data instanceof ArrayBuffer)load(event.data);
+});
+function move(value){if(!pdf)return;pageNumber=Math.max(1,Math.min(pdf.numPages,Number(value)||1));render();}
+$('prev').onclick=()=>move(pageNumber-1);$('next').onclick=()=>move(pageNumber+1);$('page').onchange=()=>move($('page').value);
+$('smaller').onclick=()=>{fit=false;scale=Math.max(.25,scale-.15);render();};$('larger').onclick=()=>{fit=false;scale=Math.min(3,scale+.15);render();};$('fit').onclick=()=>{fit=true;render();};$('actual').onclick=()=>{fit=false;scale=1;render();};
+let resize;window.addEventListener('resize',()=>{clearTimeout(resize);if(fit)resize=setTimeout(render,150);});
+window.addEventListener('pagehide',()=>{++revision;if(loading)loading.destroy();});

@@ -71,24 +71,30 @@
       window.parent.postMessage({type:'danga:apply-price',version:1,item:fresh},PARENT);
     }catch(e){error(e.message);}finally{control.disabled=false;}
   }
+  function waitPDFViewer(tab){
+    return new Promise((resolve,reject)=>{
+      const origin=location.origin;
+      const cleanup=()=>{clearInterval(ping);clearTimeout(timeout);window.removeEventListener('message',receive);};
+      const receive=event=>{if(event.origin===origin && event.source===tab && event.data?.type==='danga:pdf-ready'){cleanup();resolve();}};
+      window.addEventListener('message',receive);
+      const ping=setInterval(()=>{if(tab.closed){cleanup();reject(new Error('PDF 탭이 닫혔습니다.'));}else tab.postMessage({type:'danga:pdf-ping'},origin);},200);
+      const timeout=setTimeout(()=>{cleanup();reject(new Error('전용 PDF 뷰어를 불러오지 못했습니다. NAS 업데이트 파일을 확인해 주세요.'));},20000);
+    });
+  }
   async function openPDFTab(doc,page=1){
-    error('');
-    const ticket=++pdfTabRequest;
+    error('');const ticket=++pdfTabRequest;
     const reused=pdfTab && !pdfTab.closed;
-    const tab=reused?pdfTab:window.open('about:blank','_blank');
+    const tab=reused?pdfTab:window.open('pdf-viewer.php','_blank');
     if(!tab){error('새 탭이 차단되었습니다. 이 사이트의 팝업을 허용한 뒤 다시 눌러주세요.');return;}
-    pdfTab=tab;
-    if(!reused){tab.opener=null;tab.document.title=doc.title;tab.document.body.textContent='원본 PDF를 불러오는 중입니다.';}
-    tab.focus();
-    const loginToken=token;
+    pdfTab=tab;if(!reused)tab.opener=null;tab.focus();const loginToken=token;
     try{
-      const response=await request('pdf',{id:doc.id});const blob=await response.blob();
-      if(ticket!==pdfTabRequest)return;
-      if(token!==loginToken || !token || tab.closed){if(!reused && !tab.closed)tab.close();return;}
-      const url=URL.createObjectURL(blob);externalPDFs.add(url);
-      tab.location.href=url+'#page='+Math.max(1,Math.min(doc.pages,Number(page)||1))+'&zoom=100';
-      tab.focus();
-    }catch(e){if(ticket===pdfTabRequest){if(!reused && !tab.closed)tab.close();error(e.message);}}
+      const ready=waitPDFViewer(tab);ready.catch(()=>{});
+      // Authorization stays in the NAS widget, never in the viewer URL or tab.
+      const response=await request('pdf',{id:doc.id});const data=await response.arrayBuffer();
+      await ready;
+      if(ticket!==pdfTabRequest || token!==loginToken || !token || tab.closed)return;
+      tab.postMessage({type:'danga:pdf-data',title:doc.title,page:Math.max(1,Math.min(doc.pages,Number(page)||1)),data},location.origin,[data]);tab.focus();
+    }catch(e){if(ticket===pdfTabRequest)error(e.message);}
   }
   async function openPDF(doc,page,item){error('');clearPDF();const ticket=pdfRequest;$('pdfTitle').textContent=doc.title;$('pdfMeta').textContent=`적용일 ${doc.effective_date || '-'} · ${doc.pages}쪽${item?' · '+item.model+' · '+item.spec+' · '+(item.status==='available'?money(item.price_krw):'문의'):''}`;
     $('confirmLabel').hidden=true;$('apply').hidden=true;$('pdfDialog').showModal();
