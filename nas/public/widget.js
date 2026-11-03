@@ -3,13 +3,14 @@
   const PARENT='https://retirelab.github.io';
   const $=id=>document.getElementById(id);
   let pdfRequest=0;
+  const externalPDFs=new Set();
   let token='', catalog=null, blobURL='', selected=null, currentDoc=null, idleTimer, maxTimer;
   const error=message=>{$('error').textContent=message || '';};
   const money=n=>new Intl.NumberFormat('ko-KR').format(n)+'원';
   const text=(tag,value,cls)=>{const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;};
   const button=(label,handler)=>{const e=text('button',label);e.type='button';e.addEventListener('click',handler);return e;};
   function clearPDF(){pdfRequest++; $('pdfFrame').removeAttribute('src');$('pdfNew').removeAttribute('href');if(blobURL)URL.revokeObjectURL(blobURL);blobURL='';selected=null;currentDoc=null;$('confirmed').checked=false;$('apply').disabled=true; }
-  function reset(){token='';catalog=null;clearTimeout(idleTimer);clearTimeout(maxTimer);clearPDF();if($('pdfDialog').open)$('pdfDialog').close();$('results').replaceChildren();$('documents').replaceChildren();$('catalog').hidden=true;$('login').hidden=false;$('lock').hidden=true;$('pin').value='';}
+  function reset(){for(const url of externalPDFs)URL.revokeObjectURL(url);externalPDFs.clear();token='';catalog=null;clearTimeout(idleTimer);clearTimeout(maxTimer);clearPDF();if($('pdfDialog').open)$('pdfDialog').close();$('results').replaceChildren();$('documents').replaceChildren();$('catalog').hidden=true;$('login').hidden=false;$('lock').hidden=true;$('pin').value='';}
   function touch(){clearTimeout(idleTimer);idleTimer=setTimeout(()=>lock('30분 동안 요청이 없어 잠겼습니다.'),1800000);}
   async function request(action,params={},body){
     const response=await fetch('service.php?'+new URLSearchParams({action,...params}),{method:body?'POST':'GET',cache:'no-store',credentials:'omit',headers:{...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
@@ -24,7 +25,7 @@
       catalog=await (await request('catalog')).json();$('login').hidden=true;$('catalog').hidden=false;$('lock').hidden=false;
       $('maker').replaceChildren(new Option('전체 업체',''));[...new Set(catalog.items.map(i=>i.maker))].sort().forEach(m=>$('maker').add(new Option(m,m)));
       $('demo').textContent=catalog.demo?'가상 샘플입니다. 실제 견적에 사용하지 마세요.':'';
-      $('documents').replaceChildren();(catalog.documents || []).forEach(doc=>$('documents').append(button(doc.title+' · '+doc.pages+'쪽',()=>openPDF(doc,1,null))));
+      $('documents').replaceChildren();(catalog.documents || []).forEach(doc=>$('documents').append(button(doc.title+' · '+doc.pages+'쪽 · 새 탭으로 보기',()=>openPDFTab(doc))));
       if(!catalog.documents?.length)$('documents').append(text('p','등록된 원본 PDF가 없습니다.'));
       render();
     }catch(e){if(token)reset();error(e.message);}finally{submit.disabled=false;}
@@ -42,6 +43,19 @@
   }
   $('query').oninput=render;$('maker').onchange=render;
   function jump(){if(!blobURL)return;const page=Math.max(1,Math.min(currentDoc.pages,Number($('page').value)||1));$('page').value=page;const url=blobURL+'#page='+page+'&view=FitH';$('pdfFrame').src=url;$('pdfNew').href=url;$('confirmed').checked=false;$('apply').disabled=true;}
+  async function openPDFTab(doc){
+    error('');
+    // Open synchronously during the click, before the authenticated fetch.
+    const tab=window.open('about:blank','_blank');
+    if(!tab){error('새 탭이 차단되었습니다. 이 사이트의 팝업을 허용한 뒤 다시 눌러주세요.');return;}
+    tab.opener=null;tab.document.title=doc.title;tab.document.body.textContent='원본 PDF를 불러오는 중입니다.';
+    const loginToken=token;
+    try{
+      const response=await request('pdf',{id:doc.id});const blob=await response.blob();
+      if(token!==loginToken || !token || tab.closed){if(!tab.closed)tab.close();return;}
+      const url=URL.createObjectURL(blob);externalPDFs.add(url);tab.location.replace(url+'#page=1&view=FitH');
+    }catch(e){if(!tab.closed)tab.close();error(e.message);}
+  }
   async function openPDF(doc,page,item){error('');clearPDF();const ticket=pdfRequest;$('pdfTitle').textContent=doc.title;$('pdfMeta').textContent=`적용일 ${doc.effective_date || '-'} · ${doc.pages}쪽${item?' · '+item.model+' · '+item.spec+' · '+(item.status==='available'?money(item.price_krw):'문의'):''}`;
     $('confirmLabel').hidden=true;$('apply').hidden=true;$('pdfDialog').showModal();
     try {const response=await request('pdf',{id:doc.id});const blob=await response.blob();if(!$('pdfDialog').open || ticket!==pdfRequest)return;blobURL=URL.createObjectURL(blob);currentDoc=doc;selected=item;$('page').max=doc.pages;$('page').value=page;jump();
