@@ -1,7 +1,7 @@
 import {getDocument,GlobalWorkerOptions} from './vendor/pdfjs/legacy/build/pdf.min.js';
 GlobalWorkerOptions.workerSrc=new URL('./vendor/pdfjs/legacy/build/pdf.worker.min.js',import.meta.url).href;
 const $=id=>document.getElementById(id);
-let pdf=null,loading=null,renderTask=null,pageNumber=1,scale=1,fit=true,revision=0,source=null,loadVersion=0;
+let pdf=null,loading=null,renderTask=null,pageNumber=1,scale=1.5,fit=false,revision=0,source=null,loadVersion=0;
 const origin=location.origin;
 function status(message){$('status').textContent=message;}
 async function render(){
@@ -28,7 +28,7 @@ async function load(message){
   document.title=message.title || '단가표 원본';$('title').textContent=document.title;
   try{
     const task=getDocument({data:new Uint8Array(message.data),isEvalSupported:false,cMapUrl:new URL('./vendor/pdfjs/cmaps/',import.meta.url).href,cMapPacked:true,standardFontDataUrl:new URL('./vendor/pdfjs/standard_fonts/',import.meta.url).href,wasmUrl:new URL('./vendor/pdfjs/wasm/',import.meta.url).href});
-    loading=task;const documentPDF=await task.promise;if(loading!==task)return;pdf=documentPDF;pageNumber=Math.max(1,Math.min(pdf.numPages,Number(message.page)||1));fit=true;await render();
+    loading=task;const documentPDF=await task.promise;if(loading!==task)return;pdf=documentPDF;pageNumber=Math.max(1,Math.min(pdf.numPages,Number(message.page)||1));fit=false;scale=1.5;window.scrollTo(0,0);await render();
   }catch(e){status('PDF를 열지 못했습니다: '+e.message);}
 }
 window.addEventListener('message',event=>{
@@ -38,8 +38,29 @@ window.addEventListener('message',event=>{
   }
   if(event.source===source && event.data?.type==='danga:pdf-data' && event.data.data instanceof ArrayBuffer)load(event.data);
 });
-function move(value){if(!pdf)return;pageNumber=Math.max(1,Math.min(pdf.numPages,Number(value)||1));render();}
+function move(value){if(!pdf)return;const next=Math.max(1,Math.min(pdf.numPages,Number(value)||1));if(next===pageNumber)return;pageNumber=next;window.scrollTo(0,0);render();}
 $('prev').onclick=()=>move(pageNumber-1);$('next').onclick=()=>move(pageNumber+1);$('page').onchange=()=>move($('page').value);
 $('smaller').onclick=()=>{fit=false;scale=Math.max(.25,scale-.15);render();};$('larger').onclick=()=>{fit=false;scale=Math.min(3,scale+.15);render();};$('fit').onclick=()=>{fit=true;render();};$('actual').onclick=()=>{fit=false;scale=1;render();};
+function editing(target){return target instanceof Element && !!target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])');}
+window.addEventListener('keydown',event=>{
+  if(!pdf || editing(event.target) || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey)return;
+  const direction={ArrowLeft:-1,ArrowUp:-1,ArrowRight:1,ArrowDown:1}[event.key];
+  if(!direction)return;event.preventDefault();if(!event.repeat)move(pageNumber+direction);
+});
+// Scroll tall pages normally, then turn one page at the top/bottom edge.
+let wheelDistance=0,wheelDirection=0,wheelTime=0,lastTurn=-Infinity;
+window.addEventListener('wheel',event=>{
+  if(!pdf || editing(event.target) || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !event.deltaY || Math.abs(event.deltaX)>Math.abs(event.deltaY))return;
+  const now=performance.now(),direction=Math.sign(event.deltaY),scroll=document.scrollingElement;
+  const atEdge=direction<0?scroll.scrollTop<=2:scroll.scrollTop+innerHeight>=scroll.scrollHeight-2;
+  if(!atEdge){wheelDistance=0;return;}
+  if((direction<0 && pageNumber===1) || (direction>0 && pageNumber===pdf.numPages))return;
+  event.preventDefault();
+  if(now-lastTurn<650){wheelTime=now;wheelDistance=0;return;}
+  if(direction!==wheelDirection || now-wheelTime>200)wheelDistance=0;
+  wheelDirection=direction;wheelTime=now;
+  wheelDistance+=Math.abs(event.deltaY)*(event.deltaMode===1?16:event.deltaMode===2?innerHeight:1);
+  if(wheelDistance>=60){wheelDistance=0;lastTurn=now;move(pageNumber+direction);}
+},{passive:false});
 let resize;window.addEventListener('resize',()=>{clearTimeout(resize);if(fit)resize=setTimeout(render,150);});
 window.addEventListener('pagehide',()=>{++revision;if(loading)loading.destroy();});
